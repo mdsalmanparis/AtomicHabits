@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-poppins: 'Poppins', sans-serif;
+
+  --color-accent-green: #10b981;
+  --color-accent-green-neon: #00ff66;
+  --color-accent-cyan: #06b6d4;
+  --color-accent-red: #ef4444;
+  --color-accent-purple: #8b5cf6;
+
+  --color-bg-primary: var(--bg-color);
+  --color-text-primary: var(--text-color);
+  --color-card-bg: var(--card-bg);
+  --color-border-primary: var(--border-color);
+  --color-border-hover: var(--border-hover);
+  
+  --color-btn-primary-bg: var(--btn-primary-bg);
+  --color-btn-primary-text: var(--btn-primary-text);
+  --color-btn-primary-hover: var(--btn-primary-hover);
+  
+  --color-btn-secondary-bg: var(--btn-secondary-bg);
+  --color-btn-secondary-text: var(--btn-secondary-text);
+  --color-btn-secondary-border: var(--btn-secondary-border);
+  --color-btn-secondary-hover: var(--btn-secondary-hover);
+}
+
+:root {
+  --bg-color: #000000;
+  --text-color: #ffffff;
+  --card-bg: #0a0a0a;
+  --border-color: #1a1a1a;
+  --border-hover: #333333;
+  
+  --btn-primary-bg: #ffffff;
+  --btn-primary-text: #000000;
+  --btn-primary-hover: #e5e5e5;
+  
+  --btn-secondary-bg: #000000;
+  --btn-secondary-text: #ffffff;
+  --btn-secondary-border: #262626;
+  --btn-secondary-hover: #0a0a0a;
+  --btn-secondary-hover-border: #525252;
+  
+  --input-bg: #000000;
+  --input-border: #262626;
+  --input-focus-border: #ffffff;
+  
+  --glass-bg: rgba(10, 10, 10, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  
+  --glow-shadow: rgba(255, 255, 255, 0.03);
+}
+
+.light {
+  --bg-color: #ffffff;
+  --text-color: #000000;
+  --card-bg: #f9f9f9;
+  --border-color: #e5e5e5;
+  --border-hover: #a3a3a3;
+  
+  --btn-primary-bg: #000000;
+  --btn-primary-text: #ffffff;
+  --btn-primary-hover: #171717;
+  
+  --btn-secondary-bg: #ffffff;
+  --btn-secondary-text: #000000;
+  --btn-secondary-border: #e5e5e5;
+  --btn-secondary-hover: #f5f5f5;
+  --btn-secondary-hover-border: #a3a3a3;
+  
+  --input-bg: #ffffff;
+  --input-border: #e5e5e5;
+  --input-focus-border: #000000;
+  
+  --glass-bg: rgba(245, 245, 245, 0.85);
+  --glass-border: rgba(0, 0, 0, 0.08);
+  
+  --glow-shadow: rgba(0, 0, 0, 0.02);
+}
+
+@layer base {
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--bg-color);
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--btn-secondary-border);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-hover);
+  }
+}
+
+/* CRED Style Custom Utility Classes */
+.cred-glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  transition: all 0.2s ease;
+}
+
+.cred-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cred-card:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 0 20px var(--glow-shadow);
+}
+
+.cred-btn-primary {
+  background: var(--btn-primary-bg);
+  color: var(--btn-primary-text);
+  font-family: var(--font-poppins);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.cred-btn-primary:hover:not(:disabled) {
+  background: var(--btn-primary-hover);
+  transform: translateY(-1px);
+}
+
+.cred-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.cred-btn-secondary {
+  background: var(--btn-secondary-bg);
+  color: var(--btn-secondary-text);
+  border: 1px solid var(--btn-secondary-border);
+  font-family: var(--font-poppins);
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.cred-btn-secondary:hover:not(:disabled) {
+  border-color: var(--btn-secondary-hover-border);
+  background: var(--btn-secondary-hover);
+}
+
+.cred-input {
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-color);
+  transition: all 0.2s ease;
+}
+
+.cred-input:focus {
+  border-color: var(--input-focus-border);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--input-focus-border);
+}
+
+.glow-green {
+  box-shadow: 0 0 15px rgba(0, 255, 102, 0.15);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 15px rgba(6, 182, 212, 0.15);
+}
