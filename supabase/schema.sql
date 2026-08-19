@@ -126,8 +126,13 @@ create table if not exists habitpro.streak_freezes_used (
 alter table habitpro.streak_freezes_used enable row level security;
 
 drop policy if exists "Users can perform all actions on their own streak freezes" on habitpro.streak_freezes_used;
-create policy "Users can perform all actions on their own streak freezes" on habitpro.streak_freezes_used
-  for all using (auth.uid() = user_id);
+drop policy if exists "Users can view their own streak freezes" on habitpro.streak_freezes_used;
+drop policy if exists "Users can insert their own streak freezes" on habitpro.streak_freezes_used;
+drop policy if exists "Users can delete their own streak freezes" on habitpro.streak_freezes_used;
+
+create policy "Users can view their own streak freezes" on habitpro.streak_freezes_used for select using (auth.uid() = user_id);
+create policy "Users can insert their own streak freezes" on habitpro.streak_freezes_used for insert with check (auth.uid() = user_id);
+create policy "Users can delete their own streak freezes" on habitpro.streak_freezes_used for delete using (auth.uid() = user_id);
 
 -- Create Achievements table in habitpro
 create table if not exists habitpro.achievements (

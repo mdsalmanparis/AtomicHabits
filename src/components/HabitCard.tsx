@@ -22,7 +22,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 }) => {
   const logHabit = useStore((state) => state.logHabit);
   const toggleSkip = useStore((state) => state.toggleSkip);
-  const archiveHabit = useStore((state) => state.archiveHabit);
   const profile = useStore((state) => state.profile);
   const logs = useStore((state) => state.logs);
   const freezes = useStore((state) => state.freezes);
@@ -305,35 +304,25 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   ? 'text-sky-400'
                   : stats.statusToday === 'skipped'
                   ? 'text-amber-500'
-                  : stats.completedToday ||
-                    stats.minCompletedToday
-                  ? 'text-amber-400'
+                  : stats.completedToday || stats.minCompletedToday
+                  ? 'text-yellow-500' // Gold color for completed streaks
                   : 'text-neutral-500'
               }`}
               title={
-                stats.statusToday ===
-                'frozen'
+                stats.statusToday === 'frozen'
                   ? 'Streak Frozen'
                   : `${stats.currentStreak} day streak`
               }
             >
-              {stats.statusToday ===
-              'frozen' ? (
-                /*
-                 * Frozen is represented ONLY
-                 * by the shield.
-                 */
+              {stats.statusToday === 'frozen' ? (
                 <Icons.Shield className="h-3.5 w-3.5" />
               ) : (
                 <>
                   <Icons.Flame className="h-3.5 w-3.5" />
-
                   <span>
                     {stats.currentStreak} day streak
                   </span>
-
-                  {stats.bestStreak >
-                    stats.currentStreak && (
+                  {stats.bestStreak > stats.currentStreak && (
                     <span className="text-[10px] text-neutral-600 font-normal ml-1">
                       (best {stats.bestStreak})
                     </span>
@@ -688,8 +677,8 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               )}
             </div>
 
-            {/* Edit + Archive */}
-            <div className="flex items-center gap-4">
+            {/* Edit */}
+            <div>
               {onEditClick && (
                 <button
                   onClick={(e) => {
@@ -702,24 +691,6 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   Edit Habit
                 </button>
               )}
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-
-                  if (
-                    confirm(
-                      `Archive habit: "${habit.name}"?`
-                    )
-                  ) {
-                    archiveHabit(habit.id);
-                  }
-                }}
-                className="text-neutral-600 hover:text-red-500 text-[10px] uppercase font-bold tracking-wider flex items-center gap-1 hover:underline select-none cursor-pointer"
-              >
-                <Icons.Archive className="h-3 w-3" />
-                Archive
-              </button>
             </div>
           </div>
         </div>

@@ -31,6 +31,7 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
   const addCategory = useStore(state => state.addCategory);
   const addHabit = useStore(state => state.addHabit);
   const updateHabit = useStore(state => state.updateHabit);
+  const archiveHabit = useStore(state => state.archiveHabit);
   const habits = useStore(state => state.habits);
   
   const editHabit = editHabitId ? habits.find(h => h.id === editHabitId) : undefined;
@@ -478,7 +479,21 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
           </div>
 
           {/* Form Actions */}
-          <div className="flex gap-3 border-t border-border-primary pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 border-t border-border-primary pt-4">
+            {editHabitId && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (confirm(`Archive habit: "${editHabit?.name}"?`)) {
+                    await archiveHabit(editHabitId);
+                    onClose();
+                  }
+                }}
+                className="py-3 px-4 rounded-lg border border-red-900/60 text-red-500 bg-red-950/15 hover:bg-red-950/30 hover:border-red-650 text-sm cursor-pointer transition-colors font-bold uppercase tracking-wider select-none shrink-0"
+              >
+                Archive
+              </button>
+            )}
             <button
               type="button"
               onClick={onClose}
@@ -490,7 +505,7 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
               type="submit"
               className="flex-1 py-3 rounded-lg cred-btn-primary text-sm cursor-pointer"
             >
-              Start Habit Loop
+              {editHabitId ? 'Save Changes' : 'Start Habit Loop'}
             </button>
           </div>
         </form>

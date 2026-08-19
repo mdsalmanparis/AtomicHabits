@@ -64,7 +64,7 @@ export const Dashboard: React.FC<DashboardProps> = () => {
 
   const dateSwitcherRange = Array.from({ length: 7 }, (_, i) => {
     return addDays(todayLogicalStr, -i);
-  }).reverse();
+  });
 
   // Level progress XP percentage
   const currentXP = profile.xp;
@@ -87,8 +87,9 @@ export const Dashboard: React.FC<DashboardProps> = () => {
               <div className="relative flex items-center justify-center h-16 w-16 shrink-0 select-none">
                 <svg className="h-16 w-16 -rotate-90">
                   <circle
-                    className="text-neutral-850 stroke-[4px]"
+                    className="text-neutral-200 dark:text-neutral-800 stroke-[4px]"
                     fill="transparent"
+                    stroke="currentColor"
                     r={24}
                     cx={32}
                     cy={32}
@@ -99,6 +100,7 @@ export const Dashboard: React.FC<DashboardProps> = () => {
                     style={{ strokeDashoffset: (2 * Math.PI * 24) - (percentage / 100) * (2 * Math.PI * 24) }}
                     strokeLinecap="round"
                     fill="transparent"
+                    stroke="currentColor"
                     r={24}
                     cx={32}
                     cy={32}

@@ -455,12 +455,19 @@ export const useStore = create<AppState>((set, get) => ({
     
     set({ logs: updatedLogs });
 
-    await supabase
+    const { error: upsertError } = await supabase
       .from('habit_logs')
       .upsert({
         ...updatedLog,
         user_id: user.id
+      }, {
+        onConflict: 'habit_id,logical_date'
       });
+      
+    if (upsertError) {
+      console.error("Error saving habit log:", upsertError);
+      throw upsertError;
+    }
     
     // Adjust XP
     const xpDelta = xpAwarded - (existingLog ? existingLog.xp_earned : 0);
@@ -540,12 +547,19 @@ export const useStore = create<AppState>((set, get) => ({
     
     set({ logs: updatedLogs });
 
-    await supabase
+    const { error: upsertError } = await supabase
       .from('habit_logs')
       .upsert({
         ...updatedLog,
         user_id: user.id
+      }, {
+        onConflict: 'habit_id,logical_date'
       });
+      
+    if (upsertError) {
+      console.error("Error toggling skip log:", upsertError);
+      throw upsertError;
+    }
     
     const xpDelta = 0 - (existingLog ? existingLog.xp_earned : 0);
     if (xpDelta !== 0) {
@@ -627,17 +641,27 @@ export const useStore = create<AppState>((set, get) => ({
     
     set({ profile: updatedProfile, freezes: updatedFreezes });
     
-    await supabase
+    const { error: profileError } = await supabase
       .from('profiles')
       .update({ streak_shields: updatedProfile.streak_shields })
       .eq('id', user.id);
       
-    await supabase
+    if (profileError) {
+      console.error("Error updating profiles shields:", profileError);
+      throw profileError;
+    }
+      
+    const { error: freezeError } = await supabase
       .from('streak_freezes_used')
       .insert({
         user_id: user.id,
         logical_date: dateStr
       });
+
+    if (freezeError) {
+      console.error("Error inserting streak freeze:", freezeError);
+      throw freezeError;
+    }
     
     // Recalculate streaks
     const updatedHabits = habits.map(h => {
