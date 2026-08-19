@@ -29,6 +29,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const useStreakFreeze = useStore(
     (state) => state.useStreakFreeze
   );
+  const showConfirm = useStore((state) => state.showConfirm);
 
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -106,13 +107,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   ) => {
     e.stopPropagation();
 
-    if (
-      confirm(
-        `Use 1 Streak Shield to freeze your streak for ${activeDateStr}?`
-      )
-    ) {
-      useStreakFreeze(activeDateStr);
-    }
+    showConfirm(
+      'Streak Freeze Shield',
+      `Use 1 Streak Shield to freeze your streak for ${activeDateStr}?`,
+      async () => {
+        await useStreakFreeze(habit.id, activeDateStr);
+      }
+    );
   };
 
   const handleToggleSkip = (
@@ -151,12 +152,27 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         <button
           onClick={handleToggleSkip}
           title="Click to undo skip"
-          className="h-12 min-w-[120px] px-5 rounded-xl border border-amber-700/70 bg-amber-950/30 text-amber-400 flex items-center justify-center gap-2 transition-all hover:bg-amber-950/50 hover:border-amber-500 hover:text-amber-300 cursor-pointer"
+          className="h-12 min-w-[120px] px-5 rounded-xl border border-amber-600/40 dark:border-amber-700/70 bg-amber-50 dark:bg-amber-950/30 text-amber-600 dark:text-amber-400 flex items-center justify-center gap-2 transition-all hover:bg-amber-100 dark:hover:bg-amber-950/50 hover:border-amber-500 hover:text-amber-700 dark:hover:text-amber-300 cursor-pointer"
         >
           <Icons.Ban className="h-4 w-4" />
 
           <span className="text-xs font-bold uppercase tracking-widest">
             Skipped
+          </span>
+        </button>
+      );
+    }
+
+    if (activeStatus === 'frozen') {
+      return (
+        <button
+          className="h-12 min-w-[120px] px-5 rounded-xl border border-sky-600/35 dark:border-sky-800/70 bg-sky-50 dark:bg-sky-950/20 text-sky-600 dark:text-sky-400 flex items-center justify-center gap-2 select-none cursor-default"
+          title="Streak is frozen for today"
+        >
+          <Icons.Shield className="h-4 w-4" />
+
+          <span className="text-xs font-bold uppercase tracking-widest">
+            Frozen
           </span>
         </button>
       );

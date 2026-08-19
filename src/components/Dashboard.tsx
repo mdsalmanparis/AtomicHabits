@@ -28,6 +28,7 @@ export const Dashboard: React.FC<DashboardProps> = () => {
   const habits = useStore(state => state.habits);
   const logs = useStore(state => state.logs);
   const buyStreakShield = useStore(state => state.buyStreakShield);
+  const showConfirm = useStore(state => state.showConfirm);
   
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [editHabitId, setEditHabitId] = useState<string | undefined>(undefined);
@@ -40,10 +41,14 @@ export const Dashboard: React.FC<DashboardProps> = () => {
     return acc;
   }, {} as Record<string, typeof activeHabits>);
 
-  const handleBuyShield = async () => {
-    if (confirm('Exchange 150 XP for 1 Streak Shield?')) {
-      await buyStreakShield();
-    }
+  const handleBuyShield = () => {
+    showConfirm(
+      'Buy Streak Shield',
+      'Exchange 150 XP for 1 Streak Shield?',
+      async () => {
+        await buyStreakShield();
+      }
+    );
   };
 
   const todayLogicalStr = getLogicalDate(new Date(), profile.day_offset_hours);
@@ -66,14 +71,7 @@ export const Dashboard: React.FC<DashboardProps> = () => {
     return addDays(todayLogicalStr, -i);
   });
 
-  // Level progress XP percentage
-  const currentXP = profile.xp;
-  const currentLevel = profile.level;
-  const xpBasis = (currentLevel - 1) * 200;
-  const xpNeeded = currentLevel * 200;
-  const currentLevelProgress = currentXP - xpBasis;
-  const levelXPNeeded = xpNeeded - xpBasis;
-  const xpPercentage = Math.min(100, Math.round((currentLevelProgress / levelXPNeeded) * 100));
+
 
   return (
     <div className="space-y-6 font-sans selection:bg-text-primary selection:text-bg-primary transition-colors">
@@ -138,26 +136,6 @@ export const Dashboard: React.FC<DashboardProps> = () => {
               <Shield className="h-3.5 w-3.5" />
               <span>Shields: {profile.streak_shields} (Buy: 150 XP)</span>
             </button>
-          </div>
-        </div>
-
-        {/* Level & XP Progress Indicator */}
-        <div className="space-y-1.5 select-none">
-          <div className="flex justify-between text-xs font-bold font-poppins text-text-primary">
-            <div className="flex items-center gap-1">
-              <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
-              <span>Level {profile.level}</span>
-            </div>
-            <span className="text-neutral-400">
-              {currentXP} XP <span className="text-neutral-600 font-normal">/ {xpNeeded} needed</span>
-            </span>
-          </div>
-          
-          <div className="w-full h-2 bg-bg-primary rounded border border-border-primary overflow-hidden">
-            <div 
-              className="h-full bg-text-primary transition-all duration-500 ease-out"
-              style={{ width: `${xpPercentage}%` }}
-            />
           </div>
         </div>
       </div>

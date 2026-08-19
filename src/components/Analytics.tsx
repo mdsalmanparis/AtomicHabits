@@ -22,6 +22,15 @@ export const Analytics: React.FC = () => {
   const freezes = useStore(state => state.freezes);
   const profile = useStore(state => state.profile);
 
+  // Level progress XP percentage
+  const currentXP = profile.xp;
+  const currentLevel = profile.level;
+  const xpBasis = (currentLevel - 1) * 200;
+  const xpNeeded = currentLevel * 200;
+  const currentLevelProgress = currentXP - xpBasis;
+  const levelXPNeeded = xpNeeded - xpBasis;
+  const xpPercentage = Math.min(100, Math.round((currentLevelProgress / levelXPNeeded) * 100));
+
   const activeHabits = habits.filter(h => !h.is_archived);
   
   // 1. Consistency, Current Streak, and Best Streak stats
@@ -201,6 +210,28 @@ export const Analytics: React.FC = () => {
   return (
     <div className="space-y-8 font-sans selection:bg-text-primary selection:text-bg-primary transition-colors">
       
+      {/* Level & XP Progress Indicator */}
+      <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
+        <div className="space-y-1.5 select-none">
+          <div className="flex justify-between text-xs font-bold font-poppins text-text-primary">
+            <div className="flex items-center gap-1">
+              <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
+              <span>Level {profile.level}</span>
+            </div>
+            <span className="text-neutral-400">
+              {currentXP} XP <span className="text-neutral-550 font-normal">/ {xpNeeded} needed</span>
+            </span>
+          </div>
+          
+          <div className="w-full h-2 bg-bg-primary rounded-full border border-border-primary overflow-hidden">
+            <div 
+              className="h-full bg-text-primary rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${xpPercentage}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
       {/* Top Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         {/* Card 1: Consistency Percentage */}

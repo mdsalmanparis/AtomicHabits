@@ -7,6 +7,7 @@ import { Analytics } from './components/Analytics';
 import { AchievementsList } from './components/AchievementsList';
 import { Settings } from './components/Settings';
 import { Calendar, BarChart2, Trophy, Loader2, Sliders } from 'lucide-react';
+import { ConfirmDialog } from './components/ConfirmDialog';
 
 function App() {
   const init = useStore(state => state.init);
@@ -129,6 +130,7 @@ function App() {
           </span>
         </p>
       </footer>
+      <ConfirmDialog />
     </div>
   );
 }

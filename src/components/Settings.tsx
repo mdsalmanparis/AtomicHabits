@@ -11,16 +11,21 @@ export const Settings: React.FC = () => {
   const profile = useStore(state => state.profile);
   const updateDisplayName = useStore(state => state.updateDisplayName);
   const logout = useStore(state => state.logout);
+  const showConfirm = useStore(state => state.showConfirm);
 
   const [displayName, setDisplayName] = useState(profile.display_name);
   const [updatingName, setUpdatingName] = useState(false);
 
   const archivedHabits = habits.filter(h => h.is_archived);
 
-  const handleDelete = async (habitId: string, name: string) => {
-    if (confirm(`Are you sure you want to PERMANENTLY delete "${name}"? This will delete all history and cannot be undone.`)) {
-      await deleteHabitPermanently(habitId);
-    }
+  const handleDelete = (habitId: string, name: string) => {
+    showConfirm(
+      'Permanently Delete Habit',
+      `Are you sure you want to PERMANENTLY delete "${name}"? This will delete all history and cannot be undone.`,
+      async () => {
+        await deleteHabitPermanently(habitId);
+      }
+    );
   };
 
   const handleUpdateName = async (e: React.FormEvent) => {
@@ -38,10 +43,14 @@ export const Settings: React.FC = () => {
     }
   };
 
-  const handleLogoutClick = async () => {
-    if (confirm('Are you sure you want to log out?')) {
-      await logout();
-    }
+  const handleLogoutClick = () => {
+    showConfirm(
+      'Log Out',
+      'Are you sure you want to log out?',
+      async () => {
+        await logout();
+      }
+    );
   };
 
   const getIcon = (iconName: string) => {

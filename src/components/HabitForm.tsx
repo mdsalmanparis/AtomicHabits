@@ -32,6 +32,7 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
   const addHabit = useStore(state => state.addHabit);
   const updateHabit = useStore(state => state.updateHabit);
   const archiveHabit = useStore(state => state.archiveHabit);
+  const showConfirm = useStore(state => state.showConfirm);
   const habits = useStore(state => state.habits);
   
   const editHabit = editHabitId ? habits.find(h => h.id === editHabitId) : undefined;
@@ -483,11 +484,15 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
             {editHabitId && (
               <button
                 type="button"
-                onClick={async () => {
-                  if (confirm(`Archive habit: "${editHabit?.name}"?`)) {
-                    await archiveHabit(editHabitId);
-                    onClose();
-                  }
+                onClick={() => {
+                  showConfirm(
+                    'Archive Habit',
+                    `Archive habit: "${editHabit?.name}"?`,
+                    async () => {
+                      await archiveHabit(editHabitId);
+                      onClose();
+                    }
+                  );
                 }}
                 className="py-3 px-4 rounded-lg border border-red-900/60 text-red-500 bg-red-950/15 hover:bg-red-950/30 hover:border-red-650 text-sm cursor-pointer transition-colors font-bold uppercase tracking-wider select-none shrink-0"
               >

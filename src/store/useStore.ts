@@ -32,6 +32,7 @@ export interface HabitLog {
 
 export interface StreakFreeze {
   logical_date: string;
+  habit_id: string;
 }
 
 export interface Achievement {
@@ -75,11 +76,22 @@ interface AppState {
   logHabit: (habitId: string, countDelta: number, logicalDate?: string) => Promise<void>;
   toggleSkip: (habitId: string, logicalDate?: string) => Promise<void>;
   buyStreakShield: () => Promise<void>;
-  useStreakFreeze: (dateStr: string) => Promise<void>;
+  useStreakFreeze: (habitId: string, dateStr: string) => Promise<void>;
   
   // Helpers
   checkAchievements: () => void;
   addXP: (amount: number) => Promise<void>;
+  
+  // Custom confirmation dialog
+  confirmDialog: {
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+  };
+  showConfirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) => void;
+  hideConfirm: () => void;
 }
 
 const DEFAULT_CATEGORIES: Category[] = [
@@ -122,6 +134,32 @@ export const useStore = create<AppState>((set, get) => ({
   freezes: [],
   achievements: STATIC_ACHIEVEMENTS.map(a => ({ ...a })),
   theme: 'dark',
+  confirmDialog: {
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+    onCancel: undefined
+  },
+  showConfirm: (title, message, onConfirm, onCancel) => {
+    set({
+      confirmDialog: {
+        isOpen: true,
+        title,
+        message,
+        onConfirm,
+        onCancel
+      }
+    });
+  },
+  hideConfirm: () => {
+    set(state => ({
+      confirmDialog: {
+        ...state.confirmDialog,
+        isOpen: false
+      }
+    }));
+  },
   toggleTheme: () => {
     const currentTheme = get().theme;
     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
@@ -619,7 +657,7 @@ export const useStore = create<AppState>((set, get) => ({
       .eq('id', user.id);
   },
 
-  useStreakFreeze: async (dateStr) => {
+  useStreakFreeze: async (habitId, dateStr) => {
     const { profile, user, freezes, habits, logs } = get();
     if (!user) return;
 
@@ -628,7 +666,7 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
     
-    const isAlreadyFrozen = freezes.some(f => f.logical_date === dateStr);
+    const isAlreadyFrozen = freezes.some(f => f.logical_date === dateStr && f.habit_id === habitId);
     if (isAlreadyFrozen) return;
     
     const updatedProfile = {
@@ -636,7 +674,7 @@ export const useStore = create<AppState>((set, get) => ({
       streak_shields: profile.streak_shields - 1
     };
     
-    const newFreeze: StreakFreeze = { logical_date: dateStr };
+    const newFreeze: StreakFreeze = { logical_date: dateStr, habit_id: habitId };
     const updatedFreezes = [...freezes, newFreeze];
     
     set({ profile: updatedProfile, freezes: updatedFreezes });
@@ -655,6 +693,7 @@ export const useStore = create<AppState>((set, get) => ({
       .from('streak_freezes_used')
       .insert({
         user_id: user.id,
+        habit_id: habitId,
         logical_date: dateStr
       });
 

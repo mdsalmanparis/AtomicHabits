@@ -73,6 +73,7 @@ export interface HabitLog {
 
 export interface StreakFreeze {
   logical_date: string;
+  habit_id: string;
 }
 
 export interface HabitStats {
@@ -107,7 +108,11 @@ export function calculateHabitStats(
     }
   });
   
-  const freezesSet = new Set<string>(freezes.map(f => f.logical_date));
+  const freezesSet = new Set<string>(
+    freezes
+      .filter(f => f.habit_id === habit.id)
+      .map(f => f.logical_date)
+  );
   
   const creationDateStr = habit.created_at.split('T')[0];
   const allDates = getDatesRange(creationDateStr, todayStr);
