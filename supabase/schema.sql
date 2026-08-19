@@ -12,6 +12,7 @@ create table if not exists habitpro.profiles (
   level integer not null default 1,
   streak_shields integer not null default 3,
   day_offset_hours integer not null default 5, -- Day boundary at 5:00 AM
+  salah_tracker_enabled boolean not null default false,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   updated_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -31,14 +32,15 @@ create policy "Users can update their own profile" on habitpro.profiles
 create or replace function habitpro.handle_new_user()
 returns trigger as $$
 begin
-  insert into habitpro.profiles (id, display_name, xp, level, streak_shields, day_offset_hours)
+  insert into habitpro.profiles (id, display_name, xp, level, streak_shields, day_offset_hours, salah_tracker_enabled)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'display_name', new.email),
     0,
     1,
     3,
-    5
+    5,
+    false
   );
   return new;
 end;
@@ -85,6 +87,7 @@ create table if not exists habitpro.habits (
   streak_count integer not null default 0,
   best_streak integer not null default 0,
   is_archived boolean not null default false,
+  is_salah boolean not null default false,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -100,9 +103,10 @@ create table if not exists habitpro.habit_logs (
   habit_id uuid references habitpro.habits(id) on delete cascade not null,
   user_id uuid references habitpro.profiles(id) on delete cascade not null,
   logical_date date not null, -- format YYYY-MM-DD
-  count_completed integer not null default 0,
+  count_completed numeric not null default 0,
   is_minimum_version boolean not null default false,
   is_skipped boolean not null default false,
+  is_justified boolean not null default false,
   xp_earned integer not null default 0,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   constraint unique_habit_date unique (habit_id, logical_date)
@@ -118,9 +122,10 @@ create policy "Users can perform all actions on their own habit logs" on habitpr
 create table if not exists habitpro.streak_freezes_used (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  habit_id uuid references habitpro.habits(id) on delete cascade not null,
   logical_date date not null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
-  constraint unique_user_freeze_date unique (user_id, logical_date)
+  constraint unique_user_habit_freeze_date unique (user_id, habit_id, logical_date)
 );
 
 alter table habitpro.streak_freezes_used enable row level security;

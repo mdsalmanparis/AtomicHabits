@@ -22,6 +22,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 }) => {
   const logHabit = useStore((state) => state.logHabit);
   const toggleSkip = useStore((state) => state.toggleSkip);
+  const toggleJustify = useStore((state) => state.toggleJustify);
   const profile = useStore((state) => state.profile);
   const logs = useStore((state) => state.logs);
   const freezes = useStore((state) => state.freezes);
@@ -59,6 +60,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     stats.history[activeDateStr]?.status || 'pending';
 
   const isSkipped = activeStatus === 'skipped';
+  const isJustified = activeStatus === 'justified';
 
   const category = categories.find(
     (c) => c.id === habit.category_id
@@ -127,6 +129,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     toggleSkip(habit.id, activeDateStr);
   };
 
+  const handleToggleJustify = (
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation();
+    toggleJustify(habit.id, activeDateStr);
+  };
+
   const getIcon = (
     iconName: string,
     className: string = 'h-5 w-5'
@@ -158,6 +167,22 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
           <span className="text-xs font-bold uppercase tracking-widest">
             Skipped
+          </span>
+        </button>
+      );
+    }
+
+    if (isJustified) {
+      return (
+        <button
+          onClick={handleToggleJustify}
+          title="Click to undo justification"
+          className="h-12 min-w-[120px] px-5 rounded-xl border border-purple-600/40 dark:border-purple-800/70 bg-purple-50 dark:bg-purple-950/30 text-purple-600 dark:text-purple-400 flex items-center justify-center gap-2 transition-all hover:bg-purple-100 dark:hover:bg-purple-950/50 hover:border-purple-500 hover:text-purple-700 dark:hover:text-purple-300 cursor-pointer"
+        >
+          <Icons.Scale className="h-4 w-4" />
+
+          <span className="text-xs font-bold uppercase tracking-widest">
+            Justified
           </span>
         </button>
       );
@@ -200,14 +225,13 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       );
     }
 
-    const pct = Math.min(
-      100,
-      Math.round(
-        (activeCount /
-          habit.target_count) *
-          100
-      )
+    const pct = Math.round(
+      (activeCount /
+        habit.target_count) *
+        100
     );
+
+    const isCompleted = activeCount >= habit.target_count;
 
     return (
       <div className="flex items-center gap-3 select-none">
@@ -215,22 +239,22 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         <button
           onClick={handleDecrement}
           disabled={activeCount === 0}
-          className="h-8 w-8 rounded-lg border border-border-primary text-neutral-400 hover:border-border-hover hover:text-text-primary flex items-center justify-center transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+          className="h-9 w-9 rounded-lg border border-border-primary text-neutral-400 hover:border-border-hover hover:text-text-primary flex items-center justify-center transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
           aria-label="Decrease completion"
         >
           <Icons.Minus className="h-4 w-4" />
         </button>
 
         {/* Progress */}
-        <div className="text-center min-w-[50px]">
-          <div className="text-sm font-extrabold text-text-primary font-poppins">
+        <div className="text-center min-w-[55px]">
+          <div className={`text-sm font-black font-poppins ${isCompleted ? 'text-amber-500' : 'text-text-primary'}`}>
             {activeCount}{' '}
             <span className="text-neutral-500 text-xs font-normal">
               / {habit.target_count}
             </span>
           </div>
 
-          <div className="text-[10px] text-neutral-500 font-bold tracking-wider mt-0.5">
+          <div className={`text-[10px] font-extrabold tracking-wider mt-0.5 ${isCompleted ? 'text-amber-500' : 'text-neutral-500'}`}>
             {pct}%
           </div>
         </div>
@@ -238,7 +262,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         {/* Increment */}
         <button
           onClick={handleIncrement}
-          className="h-8 w-8 rounded-lg border border-border-primary text-text-primary bg-card-bg hover:border-border-hover flex items-center justify-center transition-colors cursor-pointer"
+          className="h-9 w-9 rounded-lg border border-border-primary text-text-primary bg-card-bg hover:border-border-hover flex items-center justify-center transition-all cursor-pointer"
           aria-label="Increase completion"
         >
           <Icons.Plus className="h-4 w-4" />
@@ -311,6 +335,22 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             </h3>
           </div>
 
+          {/* Visual Progress Bar for Frequency Habits */}
+          {habit.type === 'frequency' && (
+            <div className="w-full h-1 bg-neutral-200 dark:bg-neutral-850 rounded-full mt-2.5 overflow-hidden border border-border-primary/20 shrink-0 select-none">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ease-out ${
+                  activeCount > habit.target_count
+                    ? 'bg-gradient-to-r from-amber-400 to-amber-600 animate-pulse'
+                    : activeCount === habit.target_count
+                    ? 'bg-amber-400'
+                    : 'bg-text-primary opacity-60'
+                }`}
+                style={{ width: `${Math.min(100, (activeCount / habit.target_count) * 100)}%` }}
+              />
+            </div>
+          )}
+
           {/* Habit Info */}
           <div className="flex flex-wrap items-center gap-3 pt-1">
             {/* Streak */}
@@ -320,18 +360,24 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   ? 'text-sky-400'
                   : stats.statusToday === 'skipped'
                   ? 'text-amber-500'
+                  : stats.statusToday === 'justified'
+                  ? 'text-purple-500'
                   : stats.completedToday || stats.minCompletedToday
-                  ? 'text-yellow-500' // Gold color for completed streaks
+                  ? 'text-red-500' // Red color for completed streaks
                   : 'text-neutral-500'
               }`}
               title={
                 stats.statusToday === 'frozen'
                   ? 'Streak Frozen'
+                  : stats.statusToday === 'justified'
+                  ? 'Streak Justified'
                   : `${stats.currentStreak} day streak`
               }
             >
               {stats.statusToday === 'frozen' ? (
                 <Icons.Shield className="h-3.5 w-3.5" />
+              ) : stats.statusToday === 'justified' ? (
+                <Icons.Scale className="h-3.5 w-3.5" />
               ) : (
                 <>
                   <Icons.Flame className="h-3.5 w-3.5" />
@@ -381,17 +427,27 @@ export const HabitCard: React.FC<HabitCardProps> = ({
              * There is now only ONE skip UI:
              * the large Skipped/action button.
              */}
-            {!isSkipped && (
-              <button
-                onClick={handleToggleSkip}
-                className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-border-primary bg-bg-primary text-neutral-500 hover:border-amber-800 hover:text-amber-500 transition-all cursor-pointer"
-                title="Skip this habit today"
-              >
-                <Icons.Ban className="h-3.5 w-3" />
+             {!isSkipped && !isJustified && (
+               <button
+                 onClick={handleToggleSkip}
+                 className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-border-primary bg-bg-primary text-neutral-500 hover:border-amber-800 hover:text-amber-500 transition-all cursor-pointer"
+                 title="Skip this habit today"
+               >
+                 <Icons.Ban className="h-3.5 w-3" />
+                 <span>Skip</span>
+               </button>
+             )}
 
-                <span>Skip</span>
-              </button>
-            )}
+             {!isSkipped && !isJustified && (
+               <button
+                 onClick={handleToggleJustify}
+                 className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-border-primary bg-bg-primary text-neutral-500 hover:border-purple-800 hover:text-purple-500 transition-all cursor-pointer"
+                 title="Justify this habit today"
+               >
+                 <Icons.Scale className="h-3.5 w-3.5" />
+                 <span>Justify</span>
+               </button>
+             )}
 
             {/* Freeze */}
             {activeStatus === 'missed' &&
@@ -452,13 +508,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
                 const percentage =
                   habit.target_count > 0
-                    ? Math.min(
-                        100,
-                        Math.round(
-                          (completedCount /
-                            habit.target_count) *
-                            100
-                        )
+                    ? Math.round(
+                        (completedCount /
+                          habit.target_count) *
+                          100
                       )
                     : 0;
 
@@ -507,6 +560,23 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 }
 
                 /*
+                 * Justified day
+                 */
+                else if (
+                  dayStatus ===
+                  'justified'
+                ) {
+                  boxClass =
+                    'bg-purple-950/20 border border-dashed border-purple-800';
+
+                  numClass =
+                    'text-purple-400';
+
+                  textTitle =
+                    `${dateStr}: Justified excused absence`;
+                }
+
+                /*
                  * Single tick
                  */
                 else if (
@@ -546,7 +616,15 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                  */
                 else {
                   if (
-                    percentage >= 100
+                    percentage > 100
+                  ) {
+                    boxClass =
+                      'bg-amber-500 border-amber-300 ring-1 ring-amber-350';
+
+                    numClass =
+                      'text-black font-extrabold';
+                  } else if (
+                    percentage === 100
                   ) {
                     boxClass =
                       'bg-amber-400 border-amber-400';
@@ -644,6 +722,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   </span>
 
                   <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded bg-purple-950/20 border border-dashed border-purple-800" />
+                    Justified
+                  </span>
+
+                  <span className="flex items-center gap-1">
                     <div className="w-2 h-2 rounded bg-card-bg border border-border-hover" />
                     Safety Net
                   </span>
@@ -681,6 +764,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   </span>
 
                   <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded bg-amber-500 border border-amber-300 ring-1 ring-amber-350" />
+                    Extra
+                  </span>
+
+                  <span className="flex items-center gap-1">
                     <div className="w-2 h-2 rounded bg-sky-950/30 border border-sky-800" />
                     Frozen
                   </span>
@@ -688,6 +776,11 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   <span className="flex items-center gap-1">
                     <div className="w-2 h-2 rounded bg-bg-primary border border-dashed border-amber-900" />
                     Skipped
+                  </span>
+
+                  <span className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded bg-purple-950/20 border border-dashed border-purple-800" />
+                    Justified
                   </span>
                 </>
               )}

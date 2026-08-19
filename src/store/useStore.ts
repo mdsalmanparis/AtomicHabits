@@ -10,6 +10,7 @@ export interface Profile {
   level: number;
   streak_shields: number;
   day_offset_hours: number;
+  salah_tracker_enabled: boolean;
 }
 
 export interface Category {
@@ -27,6 +28,7 @@ export interface HabitLog {
   count_completed: number;
   is_minimum_version: boolean;
   is_skipped: boolean;
+  is_justified?: boolean;
   xp_earned: number;
 }
 
@@ -75,8 +77,10 @@ interface AppState {
   deleteHabitPermanently: (habitId: string) => Promise<void>;
   logHabit: (habitId: string, countDelta: number, logicalDate?: string) => Promise<void>;
   toggleSkip: (habitId: string, logicalDate?: string) => Promise<void>;
+  toggleJustify: (habitId: string, logicalDate?: string) => Promise<void>;
   buyStreakShield: () => Promise<void>;
   useStreakFreeze: (habitId: string, dateStr: string) => Promise<void>;
+  toggleSalahTracker: (enabled: boolean) => Promise<void>;
   
   // Helpers
   checkAchievements: () => void;
@@ -107,13 +111,25 @@ const STATIC_ACHIEVEMENTS: Omit<Achievement, 'unlocked_at'>[] = [
   { id: 'streak_7', title: 'Habit Loop Master', description: 'Reach a 7-day streak on any habit', xp_reward: 200, icon: 'Crown' },
   { id: 'consistency_king', title: 'Unstoppable Habit', description: 'Reach a 14-day streak on any habit', xp_reward: 300, icon: 'Trophy' },
   { id: 'streak_30', title: 'Identity Shifted', description: 'Reach a 30-day streak on any habit', xp_reward: 500, icon: 'ShieldAlert' },
+  { id: 'streak_60', title: 'Habitual Sentinel', description: 'Reach a 60-day streak on any habit', xp_reward: 800, icon: 'ShieldAlert' },
+  { id: 'streak_100', title: 'Centennial Flame', description: 'Reach a 100-day streak on any habit', xp_reward: 1500, icon: 'Zap' },
+  { id: 'streak_365', title: 'Orbit Completed', description: 'Reach a 365-day streak on any habit', xp_reward: 5000, icon: 'Crown' },
   { id: 'min_saviour', title: 'Show Up Anyway', description: 'Complete a habit via its Minimum Version to save a streak', xp_reward: 75, icon: 'Heart' },
   { id: 'shield_block', title: 'Streak Freeze', description: 'Use a Streak Freeze shield to prevent a reset', xp_reward: 75, icon: 'Shield' },
   { id: 'level_5', title: 'Self-Actualizer', description: 'Reach Level 5 in XP progress', xp_reward: 300, icon: 'TrendingUp' },
+  { id: 'level_10', title: 'Decathlete Catalyst', description: 'Reach Level 10 in XP progress', xp_reward: 400, icon: 'TrendingUp' },
+  { id: 'level_25', title: 'Silver Automator', description: 'Reach Level 25 in XP progress', xp_reward: 600, icon: 'Award' },
+  { id: 'level_50', title: 'Gold Pioneer', description: 'Reach Level 50 in XP progress', xp_reward: 1000, icon: 'Crown' },
+  { id: 'level_100', title: 'Centurion Titan', description: 'Reach Level 100 in XP progress', xp_reward: 2500, icon: 'Sparkles' },
   { id: 'cue_master', title: 'Master of Routine', description: 'Complete at least one habit in all 4 circadian phases', xp_reward: 150, icon: 'Clock' },
   { id: 'skipped_wisdom', title: 'Strategic Rest', description: 'Use your first Skip to take an intentional recovery day', xp_reward: 50, icon: 'Smile' },
+  { id: 'justify_grace', title: 'Strategic Pivot', description: 'Use a Justified excused absence to handle life surprises', xp_reward: 75, icon: 'Scale' },
   { id: 'xp_hoarder', title: 'XP Titan', description: 'Accumulate 1,000 total XP points', xp_reward: 250, icon: 'Award' },
-  { id: 'identity_champion', title: 'Identity Champion', description: 'Cast 50 total completions (votes) for a single identity', xp_reward: 250, icon: 'Sparkles' }
+  { id: 'identity_champion', title: 'Identity Champion', description: 'Cast 50 total completions (votes) for a single identity', xp_reward: 250, icon: 'Sparkles' },
+  { id: 'habits_5', title: 'Routines Builder', description: 'Maintain 5 or more active habits', xp_reward: 150, icon: 'Plus' },
+  { id: 'habits_10', title: 'Polymath Architect', description: 'Maintain 10 or more active habits', xp_reward: 300, icon: 'Grid' },
+  { id: 'early_bird', title: 'Dawn Treader', description: 'Complete a morning habit today', xp_reward: 100, icon: 'Sun' },
+  { id: 'night_owl', title: 'Midnight Oil', description: 'Complete a night habit today', xp_reward: 100, icon: 'Moon' }
 ];
 
 export const useStore = create<AppState>((set, get) => ({
@@ -124,7 +140,8 @@ export const useStore = create<AppState>((set, get) => ({
     xp: 0,
     level: 1,
     streak_shields: 3,
-    day_offset_hours: 5
+    day_offset_hours: 5,
+    salah_tracker_enabled: false
   },
   isLoading: true,
   isInitialized: false,
@@ -167,8 +184,10 @@ export const useStore = create<AppState>((set, get) => ({
     localStorage.setItem('habitpro_theme', newTheme);
     if (newTheme === 'light') {
       document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
     } else {
       document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
     }
   },
 
@@ -181,8 +200,10 @@ export const useStore = create<AppState>((set, get) => ({
     set({ theme: storedTheme });
     if (storedTheme === 'light') {
       document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
     } else {
       document.documentElement.classList.remove('light');
+      document.documentElement.classList.add('dark');
     }
     
     try {
@@ -208,7 +229,8 @@ export const useStore = create<AppState>((set, get) => ({
               xp: 0,
               level: 1,
               streak_shields: 3,
-              day_offset_hours: 5
+              day_offset_hours: 5,
+              salah_tracker_enabled: false
             })
             .select()
             .single();
@@ -313,7 +335,8 @@ export const useStore = create<AppState>((set, get) => ({
         xp: 0,
         level: 1,
         streak_shields: 3,
-        day_offset_hours: 5
+        day_offset_hours: 5,
+        salah_tracker_enabled: false
       },
       habits: [],
       logs: [],
@@ -469,10 +492,11 @@ export const useStore = create<AppState>((set, get) => ({
     const isMinMet = habit.min_version_enabled && newCount >= minVal;
     
     let xpAwarded = 0;
-    if (isCompleted) {
-      xpAwarded = habit.xp_reward;
-    } else if (isMinMet) {
-      xpAwarded = Math.round(habit.xp_reward * 0.4);
+    if (habit.type === 'single_tick') {
+      if (isCompleted) xpAwarded = habit.xp_reward;
+    } else {
+      // Proportional XP reward for frequency-based habits (e.g. 6/4 results in 1.5x XP)
+      xpAwarded = Math.round((newCount / target) * habit.xp_reward);
     }
     
     const updatedLog: HabitLog = {
@@ -481,6 +505,7 @@ export const useStore = create<AppState>((set, get) => ({
       count_completed: newCount,
       is_minimum_version: isMinMet && !isCompleted,
       is_skipped: false,
+      is_justified: false,
       xp_earned: xpAwarded
     };
     
@@ -493,18 +518,27 @@ export const useStore = create<AppState>((set, get) => ({
     
     set({ logs: updatedLogs });
 
-    const { error: upsertError } = await supabase
-      .from('habit_logs')
-      .upsert({
-        ...updatedLog,
-        user_id: user.id
-      }, {
-        onConflict: 'habit_id,logical_date'
-      });
+    let dbError = null;
+    if (existingLog) {
+      const { error } = await supabase
+        .from('habit_logs')
+        .update(updatedLog)
+        .eq('habit_id', habitId)
+        .eq('logical_date', targetDate);
+      dbError = error;
+    } else {
+      const { error } = await supabase
+        .from('habit_logs')
+        .insert({
+          ...updatedLog,
+          user_id: user.id
+        });
+      dbError = error;
+    }
       
-    if (upsertError) {
-      console.error("Error saving habit log:", upsertError);
-      throw upsertError;
+    if (dbError) {
+      console.error("Error saving habit log:", dbError);
+      throw dbError;
     }
     
     // Adjust XP
@@ -563,6 +597,7 @@ export const useStore = create<AppState>((set, get) => ({
         count_completed: 0,
         is_minimum_version: false,
         is_skipped: false,
+        is_justified: false,
         xp_earned: 0
       };
     } else {
@@ -572,6 +607,106 @@ export const useStore = create<AppState>((set, get) => ({
         count_completed: 0,
         is_minimum_version: false,
         is_skipped: true,
+        is_justified: false,
+        xp_earned: 0
+      };
+    }
+    
+    let updatedLogs = [...logs];
+    if (existingLog) {
+      updatedLogs = logs.map(l => l.habit_id === habitId && l.logical_date === targetDate ? updatedLog : l);
+    } else {
+      updatedLogs.push(updatedLog);
+    }
+    
+    set({ logs: updatedLogs });
+
+    let dbError = null;
+    if (existingLog) {
+      const { error } = await supabase
+        .from('habit_logs')
+        .update(updatedLog)
+        .eq('habit_id', habitId)
+        .eq('logical_date', targetDate);
+      dbError = error;
+    } else {
+      const { error } = await supabase
+        .from('habit_logs')
+        .insert({
+          ...updatedLog,
+          user_id: user.id
+        });
+      dbError = error;
+    }
+      
+    if (dbError) {
+      console.error("Error toggling skip log:", dbError);
+      throw dbError;
+    }
+    
+    const xpDelta = 0 - (existingLog ? existingLog.xp_earned : 0);
+    if (xpDelta !== 0) {
+      await get().addXP(xpDelta);
+    }
+    
+    // Recalculate streaks
+    const updatedHabits = get().habits.map(h => {
+      if (h.id === habitId) {
+        const stats = calculateHabitStats(h, updatedLogs, freezes, profile.day_offset_hours);
+        return {
+          ...h,
+          streak_count: stats.currentStreak,
+          best_streak: stats.bestStreak
+        };
+      }
+      return h;
+    });
+    
+    set({ habits: updatedHabits });
+
+    const updatedH = updatedHabits.find(h => h.id === habitId);
+    if (updatedH) {
+      await supabase
+        .from('habits')
+        .update({
+          streak_count: updatedH.streak_count,
+          best_streak: updatedH.best_streak
+        })
+        .eq('id', habitId);
+    }
+  },
+
+  toggleJustify: async (habitId, logicalDate) => {
+    const { user, logs, habits, profile, freezes } = get();
+    if (!user) return;
+
+    const targetDate = logicalDate || getLogicalDate(new Date(), profile.day_offset_hours);
+    
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+    
+    const existingLog = logs.find(l => l.habit_id === habitId && l.logical_date === targetDate);
+    const wasJustified = existingLog ? existingLog.is_justified : false;
+    
+    let updatedLog: HabitLog;
+    if (wasJustified) {
+      updatedLog = {
+        habit_id: habitId,
+        logical_date: targetDate,
+        count_completed: 0,
+        is_minimum_version: false,
+        is_skipped: false,
+        is_justified: false,
+        xp_earned: 0
+      };
+    } else {
+      updatedLog = {
+        habit_id: habitId,
+        logical_date: targetDate,
+        count_completed: 0,
+        is_minimum_version: false,
+        is_skipped: false,
+        is_justified: true,
         xp_earned: 0
       };
     }
@@ -595,7 +730,7 @@ export const useStore = create<AppState>((set, get) => ({
       });
       
     if (upsertError) {
-      console.error("Error toggling skip log:", upsertError);
+      console.error("Error toggling justify log:", upsertError);
       throw upsertError;
     }
     
@@ -741,6 +876,106 @@ export const useStore = create<AppState>((set, get) => ({
     }
   },
 
+  toggleSalahTracker: async (enabled: boolean) => {
+    const { user, profile, habits } = get();
+    if (!user) return;
+
+    const updatedProfile = {
+      ...profile,
+      salah_tracker_enabled: enabled
+    };
+    set({ profile: updatedProfile });
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({ salah_tracker_enabled: enabled })
+      .eq('id', user.id);
+
+    if (profileError) {
+      console.error("Error updating salah tracker settings:", profileError);
+      throw profileError;
+    }
+
+    if (enabled) {
+      const salahNames = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+      const missingSalah = salahNames.filter(name => !habits.some(h => h.is_salah && h.name === name));
+      
+      if (missingSalah.length > 0) {
+        const phasesMap: Record<string, string> = {
+          'Fajr': 'phase_1',
+          'Dhuhr': 'phase_2',
+          'Asr': 'phase_3',
+          'Maghrib': 'phase_3',
+          'Isha': 'phase_4'
+        };
+        
+        const newHabitsToInsert = missingSalah.map(name => ({
+          user_id: user.id,
+          identity: 'a devoted Muslim',
+          name: name,
+          icon: name === 'Fajr' ? 'Sunrise' : name === 'Dhuhr' ? 'Sun' : name === 'Asr' ? 'SunDim' : name === 'Maghrib' ? 'Sunset' : 'Moon',
+          type: 'single_tick',
+          target_count: 1,
+          frequency_unit: 'daily',
+          cue_phase: phasesMap[name] || 'phase_1',
+          min_version_enabled: false,
+          xp_reward: 15,
+          streak_count: 0,
+          best_streak: 0,
+          is_archived: false,
+          is_salah: true
+        }));
+        
+        const { data: insertedHabits, error: habitsError } = await supabase
+          .from('habits')
+          .insert(newHabitsToInsert)
+          .select();
+          
+        if (habitsError) {
+          console.error("Error auto-inserting salah habits:", habitsError);
+          throw habitsError;
+        }
+        
+        if (insertedHabits) {
+          set({ habits: [...habits, ...insertedHabits] });
+        }
+      }
+
+      const currentHabits = get().habits;
+      const hasWater = currentHabits.some(h => h.name.toLowerCase().includes('water') && !h.is_archived);
+      if (!hasWater) {
+        const defaultWater = {
+          user_id: user.id,
+          identity: 'a hydrated person',
+          name: 'Drink Water',
+          icon: 'Droplet',
+          type: 'frequency',
+          target_count: 4,
+          frequency_unit: 'daily',
+          cue_phase: 'all_day',
+          min_version_enabled: false,
+          xp_reward: 10,
+          streak_count: 0,
+          best_streak: 0,
+          is_archived: false,
+          is_salah: false
+        };
+        
+        const { data: insertedWater, error: waterError } = await supabase
+          .from('habits')
+          .insert(defaultWater)
+          .select()
+          .single();
+          
+        if (waterError) {
+          console.error("Error auto-inserting default water habit:", waterError);
+        } else if (insertedWater) {
+          set(state => ({ habits: [...state.habits, insertedWater] }));
+        }
+      }
+    }
+  },
+
   addXP: async (amount) => {
     const { profile, user } = get();
     if (!user) return;
@@ -823,6 +1058,9 @@ export const useStore = create<AppState>((set, get) => ({
     if (maxStreak >= 7) checkAward('streak_7', 200);
     if (maxStreak >= 14) checkAward('consistency_king', 300);
     if (maxStreak >= 30) checkAward('streak_30', 500);
+    if (maxStreak >= 60) checkAward('streak_60', 800);
+    if (maxStreak >= 100) checkAward('streak_100', 1500);
+    if (maxStreak >= 365) checkAward('streak_365', 5000);
     
     const hasMinVersionLog = logs.some(l => l.is_minimum_version && l.count_completed > 0);
     if (hasMinVersionLog) checkAward('min_saviour', 75);
@@ -845,10 +1083,41 @@ export const useStore = create<AppState>((set, get) => ({
       checkAward('skipped_wisdom', 50);
     }
 
+    // Check Justify Grace
+    const hasJustified = logs.some(l => l.is_justified);
+    if (hasJustified) {
+      checkAward('justify_grace', 75);
+    }
+
     // Check XP Titan (1000 total XP)
     if (profile.xp >= 1000) {
       checkAward('xp_hoarder', 250);
     }
+
+    // Check level achievements
+    if (profile.level >= 5) checkAward('level_5', 300);
+    if (profile.level >= 10) checkAward('level_10', 400);
+    if (profile.level >= 25) checkAward('level_25', 600);
+    if (profile.level >= 50) checkAward('level_50', 1000);
+    if (profile.level >= 100) checkAward('level_100', 2500);
+
+    // Check active habits count
+    const activeHabitsCount = habits.filter(h => !h.is_archived).length;
+    if (activeHabitsCount >= 5) checkAward('habits_5', 150);
+    if (activeHabitsCount >= 10) checkAward('habits_10', 300);
+
+    // Check early morning and night owl completions
+    const hasEarlyMorning = logs.some(l => {
+      const h = habits.find(habit => habit.id === l.habit_id);
+      return h && h.cue_phase === 'phase_1' && l.count_completed >= h.target_count;
+    });
+    if (hasEarlyMorning) checkAward('early_bird', 100);
+
+    const hasNightOwl = logs.some(l => {
+      const h = habits.find(habit => habit.id === l.habit_id);
+      return h && h.cue_phase === 'phase_4' && l.count_completed >= h.target_count;
+    });
+    if (hasNightOwl) checkAward('night_owl', 100);
 
     // Check Identity Champion (50 completions of a single identity)
     const identityCounts: Record<string, number> = {};

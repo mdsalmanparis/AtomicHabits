@@ -59,6 +59,7 @@ export interface Habit {
   streak_count: number;
   best_streak: number;
   is_archived: boolean;
+  is_salah?: boolean;
   created_at: string;
 }
 
@@ -68,6 +69,7 @@ export interface HabitLog {
   count_completed: number;
   is_minimum_version: boolean;
   is_skipped?: boolean;
+  is_justified?: boolean;
   xp_earned: number;
 }
 
@@ -82,9 +84,9 @@ export interface HabitStats {
   completedToday: boolean;
   completedYesterday: boolean;
   minCompletedToday: boolean;
-  statusToday: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'pending' | 'missed';
+  statusToday: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'pending' | 'missed';
   completionRate: number; // last 30 days percentage
-  history: Record<string, { count: number; status: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'missed' }>;
+  history: Record<string, { count: number; status: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'missed' }>;
 }
 
 /**
@@ -123,7 +125,7 @@ export function calculateHabitStats(
     const log = logsMap.get(dateStr);
     const hasFreeze = freezesSet.has(dateStr);
     
-    let status: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'missed' = 'missed';
+    let status: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'missed' = 'missed';
     let count = 0;
     
     if (log) {
@@ -133,6 +135,8 @@ export function calculateHabitStats(
       
       if (log.is_skipped) {
         status = 'skipped';
+      } else if (log.is_justified) {
+        status = 'justified';
       } else if (count >= target) {
         status = 'completed';
       } else if (habit.min_version_enabled && count >= minCount) {
@@ -163,8 +167,8 @@ export function calculateHabitStats(
     
     if (status === 'completed' || status === 'min_version') {
       tempStreak++;
-    } else if (status === 'frozen' || status === 'skipped') {
-      // Streak is frozen/skipped - it maintains the current count, does not reset, does not increment
+    } else if (status === 'frozen' || status === 'skipped' || status === 'justified') {
+      // Streak is frozen/skipped/justified - it maintains the current count, does not reset, does not increment
     } else {
       // It's a miss
       if (dateStr !== todayStr) {
@@ -182,8 +186,8 @@ export function calculateHabitStats(
   let checkDate = todayStr;
   const todayStatus = history[todayStr]?.status || 'missed';
   
-  // If not completed today, check if yesterday was completed/frozen/skipped
-  if (todayStatus === 'missed' || todayStatus === 'frozen' || todayStatus === 'skipped') {
+  // If not completed today, check if yesterday was completed/frozen/skipped/justified
+  if (todayStatus === 'missed' || todayStatus === 'frozen' || todayStatus === 'skipped' || todayStatus === 'justified') {
     checkDate = yesterdayStr;
   }
   
@@ -195,7 +199,7 @@ export function calculateHabitStats(
     
     if (status === 'completed' || status === 'min_version') {
       currentStreak++;
-    } else if (status === 'frozen' || status === 'skipped') {
+    } else if (status === 'frozen' || status === 'skipped' || status === 'justified') {
       // ignore, does not count as completed, but does not break streak
     } else {
       // If we check checkDate = todayStr and it's missed, we don't break it yet
@@ -213,7 +217,7 @@ export function calculateHabitStats(
   let checkDate30 = todayStr;
   for (let i = 0; i < 30; i++) {
     const status = history[checkDate30]?.status || 'missed';
-    if (status === 'completed' || status === 'min_version' || status === 'frozen' || status === 'skipped') {
+    if (status === 'completed' || status === 'min_version' || status === 'frozen' || status === 'skipped' || status === 'justified') {
       completions30++;
     }
     checkDate30 = addDays(checkDate30, -1);

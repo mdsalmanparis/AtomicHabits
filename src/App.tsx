@@ -6,7 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { Analytics } from './components/Analytics';
 import { AchievementsList } from './components/AchievementsList';
 import { Settings } from './components/Settings';
-import { Calendar, BarChart2, Trophy, Loader2, Sliders } from 'lucide-react';
+import { Calendar, BarChart2, Trophy, Loader2, Sliders, Flame } from 'lucide-react';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
 function App() {
@@ -53,8 +53,8 @@ function App() {
         <header className="flex justify-between items-center border-b border-border-primary pb-4">
           {/* Logo */}
           <div className="flex items-center gap-2 select-none">
-            <div className="h-7 w-7 rounded bg-btn-primary-bg flex items-center justify-center text-btn-primary-text font-extrabold text-sm font-poppins">
-              HP
+            <div className="h-7 w-7 rounded bg-btn-primary-bg flex items-center justify-center text-btn-primary-text">
+              <Flame className="h-4.5 w-4.5 text-red-500 fill-red-500 shrink-0" />
             </div>
             <span className="text-lg font-black font-poppins tracking-wider">
               HABIT<span className="text-neutral-400">PRO</span>

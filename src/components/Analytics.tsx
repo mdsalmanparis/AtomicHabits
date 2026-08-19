@@ -10,9 +10,13 @@ import {
   Tooltip, 
   PieChart, 
   Pie, 
-  Cell 
+  Cell,
+  AreaChart,
+  Area,
+  CartesianGrid
 } from 'recharts';
 import { Trophy, CircleDot, Flame, RefreshCw, Sparkles, Activity, TrendingUp } from 'lucide-react';
+import { getLevelTitle } from '../utils/levelUtils';
 
 
 
@@ -30,6 +34,7 @@ export const Analytics: React.FC = () => {
   const currentLevelProgress = currentXP - xpBasis;
   const levelXPNeeded = xpNeeded - xpBasis;
   const xpPercentage = Math.min(100, Math.round((currentLevelProgress / levelXPNeeded) * 100));
+  const levelTitle = getLevelTitle(currentLevel);
 
   const activeHabits = habits.filter(h => !h.is_archived);
   
@@ -129,6 +134,61 @@ export const Analytics: React.FC = () => {
     return { name, percentage };
   });
 
+  // Circadian phase averages (Last 14 days)
+  const phaseTotals = {
+    phase_1: { done: 0, total: 0, label: 'Morning' },
+    phase_2: { done: 0, total: 0, label: 'Afternoon' },
+    phase_3: { done: 0, total: 0, label: 'Evening' },
+    phase_4: { done: 0, total: 0, label: 'Night' }
+  };
+  
+  const last14Days = getDatesRange(addDays(todayStr, -13), todayStr);
+  last14Days.forEach(dateStr => {
+    activeHabits.forEach(h => {
+      const log = logs.find(l => l.habit_id === h.id && l.logical_date === dateStr);
+      const isDone = log ? (log.count_completed >= h.target_count || (h.min_version_enabled && log.count_completed >= h.min_version_count)) : false;
+      if (h.cue_phase in phaseTotals) {
+        phaseTotals[h.cue_phase as keyof typeof phaseTotals].total++;
+        if (isDone) {
+          phaseTotals[h.cue_phase as keyof typeof phaseTotals].done++;
+        }
+      }
+    });
+  });
+  
+  const circadianCompletionRates = Object.values(phaseTotals).map(p => ({
+    name: p.label,
+    percentage: p.total > 0 ? Math.round((p.done / p.total) * 100) : 0,
+    completions: `${p.done}/${p.total}`
+  }));
+
+  // 28-day historical consistency trend
+  const trendData = last28Days.map(dateStr => {
+    let completedCount = 0;
+    let totalScheduled = 0;
+    
+    activeHabits.forEach(h => {
+      const log = logs.find(l => l.habit_id === h.id && l.logical_date === dateStr);
+      if (log && !log.is_skipped && !log.is_justified) {
+        totalScheduled++;
+        if (log.count_completed >= h.target_count) {
+          completedCount++;
+        }
+      } else if (!log || (!log.is_skipped && !log.is_justified)) {
+        totalScheduled++;
+      }
+    });
+    
+    const percentage = totalScheduled > 0 ? Math.round((completedCount / totalScheduled) * 100) : 0;
+    const dateObj = new Date(dateStr + 'T00:00:00');
+    const label = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    return {
+      date: label,
+      percentage
+    };
+  });
+
   // 6. Habit Score: calculated based on consistency, completion rate, current streak
   // (Scale of 0-100, weighting consistency 60% and current streak 40%)
   const habitScore = activeHabits.length > 0 
@@ -214,9 +274,9 @@ export const Analytics: React.FC = () => {
       <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
         <div className="space-y-1.5 select-none">
           <div className="flex justify-between text-xs font-bold font-poppins text-text-primary">
-            <div className="flex items-center gap-1">
-              <Sparkles className="h-3.5 w-3.5 text-yellow-500" />
-              <span>Level {profile.level}</span>
+            <div className="flex items-center gap-1.5">
+              <Sparkles className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500/20" />
+              <span>Level {profile.level} — <span className="text-neutral-400 font-semibold">{levelTitle}</span></span>
             </div>
             <span className="text-neutral-400">
               {currentXP} XP <span className="text-neutral-550 font-normal">/ {xpNeeded} needed</span>
@@ -398,6 +458,57 @@ export const Analytics: React.FC = () => {
         </div>
       </div>
 
+      {/* Historical Consistency Trend Chart */}
+      <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
+        <div>
+          <h3 className="text-sm font-extrabold font-poppins text-text-primary uppercase tracking-wide">Historical Consistency Trend</h3>
+          <p className="text-[10px] text-neutral-500">Overall daily consistency trend over the last 28 logical days</p>
+        </div>
+
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="colorConsistency" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="var(--btn-primary-bg)" stopOpacity={0.35}/>
+                  <stop offset="95%" stopColor="var(--btn-primary-bg)" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+              <XAxis 
+                dataKey="date" 
+                stroke="var(--btn-secondary-border)" 
+                fontSize={10} 
+                tickLine={false} 
+                axisLine={{ stroke: 'var(--border-color)' }}
+                tickFormatter={(val, index) => (index % 5 === 0 ? val : '')} // Only show some ticks to avoid clutter
+              />
+              <YAxis 
+                stroke="var(--btn-secondary-border)" 
+                fontSize={10} 
+                tickLine={false} 
+                axisLine={{ stroke: 'var(--border-color)' }}
+                domain={[0, 100]}
+                tickFormatter={tick => `${tick}%`}
+              />
+              <Tooltip 
+                contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                itemStyle={{ color: 'var(--text-color)' }}
+                formatter={(value) => [`${value}%`, 'Consistency']}
+              />
+              <Area 
+                type="monotone" 
+                dataKey="percentage" 
+                stroke="var(--btn-primary-bg)" 
+                strokeWidth={2}
+                fillOpacity={1} 
+                fill="url(#colorConsistency)" 
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Grid of charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
@@ -538,7 +649,7 @@ export const Analytics: React.FC = () => {
         </div>
 
         {/* Weekly Consistency Recharts Bar */}
-        <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4 lg:col-span-2">
+        <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
           <div>
             <h3 className="text-sm font-extrabold font-poppins text-text-primary">Consistency by Day of the Week</h3>
             <p className="text-[10px] text-neutral-500">Average completion rate for each day of the week</p>
@@ -570,6 +681,48 @@ export const Analytics: React.FC = () => {
                 <Bar 
                   dataKey="percentage" 
                   fill="var(--btn-primary-bg)" 
+                  radius={[4, 4, 0, 0]} 
+                  maxBarSize={45}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Circadian Rhythm consistency Bar */}
+        <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
+          <div>
+            <h3 className="text-sm font-extrabold font-poppins text-text-primary">Consistency by Circadian Phase</h3>
+            <p className="text-[10px] text-neutral-500">Average completion rate for each circadian phase (Last 14 Days)</p>
+          </div>
+
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={circadianCompletionRates} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <XAxis 
+                  dataKey="name" 
+                  stroke="var(--btn-secondary-border)" 
+                  fontSize={11} 
+                  tickLine={false} 
+                  axisLine={{ stroke: 'var(--border-color)' }} 
+                />
+                <YAxis 
+                  stroke="var(--btn-secondary-border)" 
+                  fontSize={11} 
+                  tickLine={false} 
+                  axisLine={{ stroke: 'var(--border-color)' }}
+                  domain={[0, 100]}
+                  tickFormatter={tick => `${tick}%`}
+                />
+                <Tooltip 
+                  cursor={{ fill: 'rgba(255, 255, 255, 0.02)' }}
+                  contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
+                  itemStyle={{ color: 'var(--text-color)' }}
+                  formatter={(value, _, props) => [`${value}% (${props.payload.completions})`, 'Consistency']}
+                />
+                <Bar 
+                  dataKey="percentage" 
+                  fill="#8b5cf6" 
                   radius={[4, 4, 0, 0]} 
                   maxBarSize={45}
                 />
