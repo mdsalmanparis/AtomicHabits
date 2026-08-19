@@ -401,9 +401,11 @@ export const useStore = create<AppState>((set, get) => ({
         );
         return { achievements: ach };
       });
-      await supabase.from('user_achievements').insert({
+      await supabase.from('user_achievements').upsert({
         user_id: user.id,
         achievement_id: 'atomic_start'
+      }, {
+        onConflict: 'user_id,achievement_id'
       });
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     }
@@ -518,27 +520,18 @@ export const useStore = create<AppState>((set, get) => ({
     
     set({ logs: updatedLogs });
 
-    let dbError = null;
-    if (existingLog) {
-      const { error } = await supabase
-        .from('habit_logs')
-        .update(updatedLog)
-        .eq('habit_id', habitId)
-        .eq('logical_date', targetDate);
-      dbError = error;
-    } else {
-      const { error } = await supabase
-        .from('habit_logs')
-        .insert({
-          ...updatedLog,
-          user_id: user.id
-        });
-      dbError = error;
-    }
-      
-    if (dbError) {
-      console.error("Error saving habit log:", dbError);
-      throw dbError;
+    const { error: upsertError } = await supabase
+      .from('habit_logs')
+      .upsert({
+        ...updatedLog,
+        user_id: user.id
+      }, {
+        onConflict: 'habit_id,logical_date'
+      });
+    
+    if (upsertError) {
+      console.error("Error saving habit log:", upsertError);
+      throw upsertError;
     }
     
     // Adjust XP
@@ -621,27 +614,18 @@ export const useStore = create<AppState>((set, get) => ({
     
     set({ logs: updatedLogs });
 
-    let dbError = null;
-    if (existingLog) {
-      const { error } = await supabase
-        .from('habit_logs')
-        .update(updatedLog)
-        .eq('habit_id', habitId)
-        .eq('logical_date', targetDate);
-      dbError = error;
-    } else {
-      const { error } = await supabase
-        .from('habit_logs')
-        .insert({
-          ...updatedLog,
-          user_id: user.id
-        });
-      dbError = error;
-    }
+    const { error: upsertError } = await supabase
+      .from('habit_logs')
+      .upsert({
+        ...updatedLog,
+        user_id: user.id
+      }, {
+        onConflict: 'habit_id,logical_date'
+      });
       
-    if (dbError) {
-      console.error("Error toggling skip log:", dbError);
-      throw dbError;
+    if (upsertError) {
+      console.error("Error toggling skip log:", upsertError);
+      throw upsertError;
     }
     
     const xpDelta = 0 - (existingLog ? existingLog.xp_earned : 0);
@@ -869,9 +853,11 @@ export const useStore = create<AppState>((set, get) => ({
         );
         return { achievements: ach };
       });
-      await supabase.from('user_achievements').insert({
+      await supabase.from('user_achievements').upsert({
         user_id: user.id,
         achievement_id: 'shield_block'
+      }, {
+        onConflict: 'user_id,achievement_id'
       });
     }
   },
@@ -1011,9 +997,11 @@ export const useStore = create<AppState>((set, get) => ({
             );
             return { achievements: ach };
           });
-          await supabase.from('user_achievements').insert({
+          await supabase.from('user_achievements').upsert({
             user_id: user.id,
             achievement_id: 'level_5'
+          }, {
+            onConflict: 'user_id,achievement_id'
           });
         }
       }
@@ -1036,9 +1024,11 @@ export const useStore = create<AppState>((set, get) => ({
           return { achievements: ach };
         });
         
-        await supabase.from('user_achievements').insert({
+        await supabase.from('user_achievements').upsert({
           user_id: user.id,
           achievement_id: id
+        }, {
+          onConflict: 'user_id,achievement_id'
         });
         
         confetti({ particleCount: 120, spread: 70, colors: ['#00ff66', '#ffffff'] });
