@@ -45,6 +45,7 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
   const [habitType, setHabitType] = useState<'single_tick' | 'frequency'>(editHabit?.type || 'single_tick');
   const [targetCount, setTargetCount] = useState(editHabit?.target_count || 1);
   const [cuePhase, setCuePhase] = useState(editHabit?.cue_phase || 'all_day');
+  const [repeatDays, setRepeatDays] = useState<number[]>(editHabit?.repeat_days || [0, 1, 2, 3, 4, 5, 6]);
   
   // Minimum version
   const [minEnabled, setMinEnabled] = useState(editHabit?.min_version_enabled || false);
@@ -97,7 +98,8 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
         min_version_enabled: minEnabled,
         min_version_description: minEnabled ? minDesc : undefined,
         min_version_count: minEnabled ? minCount : 1,
-        xp_reward: 10
+        xp_reward: 10,
+        repeat_days: repeatDays
       };
 
       if (editHabitId) {
@@ -397,6 +399,43 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Repeat Days Selector */}
+          <div>
+            <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5">
+              Repeat Days (Weekly Schedule)
+            </label>
+            <div className="flex justify-between gap-1 bg-bg-primary border border-border-primary rounded-lg p-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((dayName, idx) => {
+                const isSelected = repeatDays.includes(idx);
+                return (
+                  <button
+                    key={dayName}
+                    type="button"
+                    onClick={() => {
+                      if (isSelected) {
+                        if (repeatDays.length > 1) {
+                          setRepeatDays(repeatDays.filter(d => d !== idx));
+                        }
+                      } else {
+                        setRepeatDays([...repeatDays, idx].sort());
+                      }
+                    }}
+                    className={`flex-1 py-1.5 text-xs font-bold rounded transition-all cursor-pointer ${
+                      isSelected
+                        ? 'bg-btn-primary-bg text-btn-primary-text'
+                        : 'text-neutral-500 hover:text-text-primary'
+                    }`}
+                  >
+                    {dayName[0]}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-neutral-500 mt-1">
+              Habit will only show on your checklist on selected days. Streaks won't break on rest days.
+            </p>
           </div>
 
           {/* Icon picker */}

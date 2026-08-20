@@ -88,6 +88,7 @@ create table if not exists habitpro.habits (
   best_streak integer not null default 0,
   is_archived boolean not null default false,
   is_salah boolean not null default false,
+  repeat_days integer[] default array[0,1,2,3,4,5,6],
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 

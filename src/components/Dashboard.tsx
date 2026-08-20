@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { HabitCard } from './HabitCard';
 import { HabitForm } from './HabitForm';
-import { getLogicalDate, formatFriendlyDate, addDays, calculateHabitStats } from '../utils/dateUtils';
+import { getLogicalDate, formatFriendlyDate, addDays, calculateHabitStats, isHabitScheduledForDate } from '../utils/dateUtils';
 import { 
   Plus, 
   Shield, 
@@ -56,12 +56,16 @@ export const Dashboard: React.FC<DashboardProps> = () => {
     }));
   };
 
+  const todayLogicalStr = getLogicalDate(new Date(), profile.day_offset_hours);
+  const [selectedDate, setSelectedDate] = useState(todayLogicalStr);
+
   const activeHabits = habits.filter(h => !h.is_archived);
+  const scheduledActiveHabits = activeHabits.filter(h => isHabitScheduledForDate(h, selectedDate));
 
   // If Salah Tracker is enabled, filter Salah and Water habits out of the standard cue phase lists
   const normalActiveHabits = profile.salah_tracker_enabled
-    ? activeHabits.filter(h => !h.is_salah && !h.name.toLowerCase().includes('water'))
-    : activeHabits;
+    ? scheduledActiveHabits.filter(h => !h.is_salah && !h.name.toLowerCase().includes('water'))
+    : scheduledActiveHabits;
 
   // Group habits by cue phase (using normalActiveHabits)
   const habitsByPhase = LIFE_PHASES_META.reduce((acc, phase) => {
@@ -69,13 +73,10 @@ export const Dashboard: React.FC<DashboardProps> = () => {
     return acc;
   }, {} as Record<string, typeof normalActiveHabits>);
 
-  const todayLogicalStr = getLogicalDate(new Date(), profile.day_offset_hours);
-  const [selectedDate, setSelectedDate] = useState(todayLogicalStr);
-
   // Calculate completed out of total active habits for the selectedDate
-  const totalCount = activeHabits.length;
+  const totalCount = scheduledActiveHabits.length;
   let completedCount = 0;
-  activeHabits.forEach(h => {
+  scheduledActiveHabits.forEach(h => {
     const log = logs.find(l => l.habit_id === h.id && l.logical_date === selectedDate);
     if (log) {
       if (log.is_skipped || log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
@@ -86,8 +87,23 @@ export const Dashboard: React.FC<DashboardProps> = () => {
   const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
   // Salah Tracker specific state and calculations
-  const salahHabits = habits.filter(h => h.is_salah && !h.is_archived);
+  const allActiveSalahHabits = habits.filter(h => h.is_salah && !h.is_archived);
   
+  const isSelectedFriday = new Date(selectedDate + 'T00:00:00').getDay() === 5;
+  const excludePrayer = isSelectedFriday ? 'Dhuhr' : 'Jummah';
+  
+  const salahHabits = allActiveSalahHabits.filter(h => h.name !== excludePrayer);
+  
+  const salahOrder: Record<string, number> = {
+    'Fajr': 1,
+    'Dhuhr': 2,
+    'Jummah': 2,
+    'Asr': 3,
+    'Maghrib': 4,
+    'Isha': 5
+  };
+  salahHabits.sort((a, b) => (salahOrder[a.name] || 99) - (salahOrder[b.name] || 99));
+
   const salahStatus = salahHabits.map(h => {
     const log = logs.find(l => l.habit_id === h.id && l.logical_date === selectedDate);
     const isCompleted = log ? log.count_completed >= h.target_count : false;
@@ -109,18 +125,22 @@ export const Dashboard: React.FC<DashboardProps> = () => {
   };
 
   const getSalahStreak = () => {
-    if (salahHabits.length === 0) return 0;
+    if (allActiveSalahHabits.length === 0) return 0;
     let streak = 0;
     let checkDate = todayLogicalStr;
     
     while (true) {
-      const allCompleted = salahHabits.every(h => {
+      const isFridayCheck = new Date(checkDate + 'T00:00:00').getDay() === 5;
+      const excludeCheck = isFridayCheck ? 'Dhuhr' : 'Jummah';
+      const targetSalahs = allActiveSalahHabits.filter(h => h.name !== excludeCheck);
+      
+      const allCompleted = targetSalahs.length > 0 && targetSalahs.every(h => {
         const log = logs.find(l => l.habit_id === h.id && l.logical_date === checkDate);
         return log && log.count_completed >= h.target_count;
       });
       
-      const isFrozen = freezes.some(f => f.logical_date === checkDate && salahHabits.some(sh => sh.id === f.habit_id));
-      const allExcused = salahHabits.every(h => {
+      const isFrozen = freezes.some(f => f.logical_date === checkDate && targetSalahs.some(sh => sh.id === f.habit_id));
+      const allExcused = targetSalahs.length > 0 && targetSalahs.every(h => {
         const log = logs.find(l => l.habit_id === h.id && l.logical_date === checkDate);
         return log && (log.is_skipped || log.is_justified);
       });
@@ -147,8 +167,11 @@ export const Dashboard: React.FC<DashboardProps> = () => {
     const mins = now.getMinutes();
     const totalMins = hrs * 60 + mins;
     
+    const isFridayToday = now.getDay() === 5;
+    const dhuhrName = isFridayToday ? 'Jummah' : 'Dhuhr';
+    
     if (totalMins <= 300) return { name: 'Fajr', time: '05:00' };
-    if (totalMins <= 750) return { name: 'Dhuhr', time: '12:30' };
+    if (totalMins <= 750) return { name: dhuhrName, time: '12:30' };
     if (totalMins <= 945) return { name: 'Asr', time: '15:45' };
     if (totalMins <= 1110) return { name: 'Maghrib', time: '18:30' };
     if (totalMins <= 1200) return { name: 'Isha', time: '20:00' };
@@ -176,11 +199,15 @@ export const Dashboard: React.FC<DashboardProps> = () => {
 
   const salahLast7Days = dateSwitcherRange.map(dStr => {
     const dayName = new Date(dStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'narrow' });
-    const dayCompleted = salahHabits.every(h => {
+    const isFridayDay = new Date(dStr + 'T00:00:00').getDay() === 5;
+    const excludeDay = isFridayDay ? 'Dhuhr' : 'Jummah';
+    const dayTargetHabits = allActiveSalahHabits.filter(h => h.name !== excludeDay);
+    
+    const dayCompleted = dayTargetHabits.length > 0 && dayTargetHabits.every(h => {
       const log = logs.find(l => l.habit_id === h.id && l.logical_date === dStr);
       return log && log.count_completed >= h.target_count;
     });
-    const dayCompletedCount = salahHabits.filter(h => {
+    const dayCompletedCount = dayTargetHabits.filter(h => {
       const log = logs.find(l => l.habit_id === h.id && l.logical_date === dStr);
       return log && log.count_completed >= h.target_count;
     }).length;
@@ -393,6 +420,7 @@ export const Dashboard: React.FC<DashboardProps> = () => {
               const detailsMap: Record<string, { icon: React.ReactNode, time: string }> = {
                 'Fajr': { icon: <Sunrise className="h-5 w-5" />, time: '05:00' },
                 'Dhuhr': { icon: <Sun className="h-5 w-5" />, time: '12:30' },
+                'Jummah': { icon: <Sun className="h-5 w-5" />, time: '12:30' },
                 'Asr': { icon: <SunDim className="h-5 w-5" />, time: '15:45' },
                 'Maghrib': { icon: <Sunset className="h-5 w-5" />, time: '18:30' },
                 'Isha': { icon: <Moon className="h-5 w-5" />, time: '20:00' }

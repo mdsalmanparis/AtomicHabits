@@ -8,6 +8,7 @@ import { AchievementsList } from './components/AchievementsList';
 import { Settings } from './components/Settings';
 import { Calendar, BarChart2, Trophy, Loader2, Sliders, Flame } from 'lucide-react';
 import { ConfirmDialog } from './components/ConfirmDialog';
+import { useNotifications } from './hooks/useNotifications';
 
 function App() {
   const init = useStore(state => state.init);
@@ -15,7 +16,13 @@ function App() {
   const isLoading = useStore(state => state.isLoading);
   const setUser = useStore(state => state.setUser);
   
+  // Initialize phase notifications reminders
+  useNotifications();
+  
   const [activeTab, setActiveTab] = useState<'habits' | 'analytics' | 'achievements' | 'settings'>('habits');
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default'
+  );
 
   useEffect(() => {
     init();
@@ -23,6 +30,16 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
+
+    if ('Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission().then(perm => {
+          setNotificationPermission(perm);
+        });
+      } else {
+        setNotificationPermission(Notification.permission);
+      }
+    }
 
     return () => {
       subscription.unsubscribe();
@@ -47,7 +64,26 @@ function App() {
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary font-sans flex flex-col justify-between selection:bg-text-primary selection:text-bg-primary transition-colors">
-      <div className="w-full max-w-4xl mx-auto px-4 md:px-6 py-6 space-y-6">
+      {notificationPermission !== 'granted' && (
+        <div className="bg-red-500/10 border-b border-red-500/20 text-red-500 py-3 px-4 text-xs font-bold font-poppins flex flex-col sm:flex-row justify-between items-center gap-2 select-none animate-fadeIn">
+          <span>⚠️ Phase Notifications are disabled! You must enable notifications for phase reminders to function.</span>
+          <button
+            onClick={async () => {
+              if ('Notification' in window) {
+                const perm = await Notification.requestPermission();
+                setNotificationPermission(perm);
+                if (perm === 'denied') {
+                  alert("Notifications are blocked in your browser settings. Please click the lock icon in the browser address bar next to the URL and toggle 'Notifications' to 'Allow'.");
+                }
+              }
+            }}
+            className="bg-red-500 text-white font-bold px-3 py-1 rounded hover:bg-red-600 transition-colors cursor-pointer shrink-0 uppercase tracking-wider text-[10px]"
+          >
+            {notificationPermission === 'denied' ? 'How to Unblock' : 'Enable Now'}
+          </button>
+        </div>
+      )}
+      <div className="w-full max-w-4xl mx-auto px-4 md:px-6 py-6 space-y-6 flex-1">
         
         {/* Navigation / Header */}
         <header className="flex justify-between items-center border-b border-border-primary pb-4">
@@ -57,7 +93,7 @@ function App() {
               <Flame className="h-4.5 w-4.5 text-red-500 fill-red-500 shrink-0" />
             </div>
             <span className="text-lg font-black font-poppins tracking-wider">
-              HABIT<span className="text-neutral-400">PRO</span>
+              Atomic <span className="text-neutral-450 dark:text-neutral-400 font-medium">HABITS</span>
             </span>
           </div>
 

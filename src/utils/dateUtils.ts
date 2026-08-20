@@ -42,6 +42,13 @@ export function getDatesRange(startDateStr: string, endDateStr: string): string[
   return dates;
 }
 
+export function isHabitScheduledForDate(habit: Habit, dateStr: string): boolean {
+  if (!habit.repeat_days || habit.repeat_days.length === 0) return true;
+  const date = parseLocalDate(dateStr);
+  const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
+  return habit.repeat_days.includes(dayOfWeek);
+}
+
 export interface Habit {
   id: string;
   identity: string;
@@ -60,6 +67,7 @@ export interface Habit {
   best_streak: number;
   is_archived: boolean;
   is_salah?: boolean;
+  repeat_days?: number[];
   created_at: string;
 }
 
@@ -84,9 +92,9 @@ export interface HabitStats {
   completedToday: boolean;
   completedYesterday: boolean;
   minCompletedToday: boolean;
-  statusToday: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'pending' | 'missed';
+  statusToday: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'pending' | 'missed' | 'not_scheduled';
   completionRate: number; // last 30 days percentage
-  history: Record<string, { count: number; status: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'missed' }>;
+  history: Record<string, { count: number; status: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'missed' | 'not_scheduled' }>;
 }
 
 /**
@@ -124,14 +132,15 @@ export function calculateHabitStats(
   allDates.forEach(dateStr => {
     const log = logsMap.get(dateStr);
     const hasFreeze = freezesSet.has(dateStr);
+    const isScheduled = isHabitScheduledForDate(habit, dateStr);
     
-    let status: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'missed' = 'missed';
+    let status: 'completed' | 'min_version' | 'frozen' | 'skipped' | 'justified' | 'missed' | 'not_scheduled' = 'missed';
     let count = 0;
     
     if (log) {
-      count = log.count_completed;
-      const target = habit.target_count;
-      const minCount = habit.min_version_enabled ? habit.min_version_count : target;
+      count = Number(log.count_completed);
+      const target = Number(habit.target_count);
+      const minCount = habit.min_version_enabled ? Number(habit.min_version_count) : target;
       
       if (log.is_skipped) {
         status = 'skipped';
@@ -143,11 +152,15 @@ export function calculateHabitStats(
         status = 'min_version';
       } else if (hasFreeze) {
         status = 'frozen';
+      } else if (!isScheduled) {
+        status = 'not_scheduled';
       } else {
         status = 'missed';
       }
     } else if (hasFreeze) {
       status = 'frozen';
+    } else if (!isScheduled) {
+      status = 'not_scheduled';
     }
     
     history[dateStr] = { count, status };
@@ -167,8 +180,8 @@ export function calculateHabitStats(
     
     if (status === 'completed' || status === 'min_version') {
       tempStreak++;
-    } else if (status === 'frozen' || status === 'skipped' || status === 'justified') {
-      // Streak is frozen/skipped/justified - it maintains the current count, does not reset, does not increment
+    } else if (status === 'frozen' || status === 'skipped' || status === 'justified' || status === 'not_scheduled') {
+      // Streak is frozen/skipped/justified/not_scheduled - it maintains the current count, does not reset, does not increment
     } else {
       // It's a miss
       if (dateStr !== todayStr) {
@@ -186,8 +199,8 @@ export function calculateHabitStats(
   let checkDate = todayStr;
   const todayStatus = history[todayStr]?.status || 'missed';
   
-  // If not completed today, check if yesterday was completed/frozen/skipped/justified
-  if (todayStatus === 'missed' || todayStatus === 'frozen' || todayStatus === 'skipped' || todayStatus === 'justified') {
+  // If not completed today, check if yesterday was completed/frozen/skipped/justified/not_scheduled
+  if (todayStatus === 'missed' || todayStatus === 'frozen' || todayStatus === 'skipped' || todayStatus === 'justified' || todayStatus === 'not_scheduled') {
     checkDate = yesterdayStr;
   }
   
@@ -199,7 +212,7 @@ export function calculateHabitStats(
     
     if (status === 'completed' || status === 'min_version') {
       currentStreak++;
-    } else if (status === 'frozen' || status === 'skipped' || status === 'justified') {
+    } else if (status === 'frozen' || status === 'skipped' || status === 'justified' || status === 'not_scheduled') {
       // ignore, does not count as completed, but does not break streak
     } else {
       // If we check checkDate = todayStr and it's missed, we don't break it yet
@@ -217,7 +230,7 @@ export function calculateHabitStats(
   let checkDate30 = todayStr;
   for (let i = 0; i < 30; i++) {
     const status = history[checkDate30]?.status || 'missed';
-    if (status === 'completed' || status === 'min_version' || status === 'frozen' || status === 'skipped' || status === 'justified') {
+    if (status === 'completed' || status === 'min_version' || status === 'frozen' || status === 'skipped' || status === 'justified' || status === 'not_scheduled') {
       completions30++;
     }
     checkDate30 = addDays(checkDate30, -1);
@@ -239,8 +252,12 @@ export function calculateHabitStats(
   const completedYesterday = (yesterdayCount >= target || (habit.min_version_enabled && yesterdayCount >= minCount)) && !(yesterdayLog && yesterdayLog.is_skipped);
   
   let statusToday: HabitStats['statusToday'] = 'pending';
-  if (todayLog && todayLog.is_skipped) {
+  if (!isHabitScheduledForDate(habit, todayStr)) {
+    statusToday = 'not_scheduled';
+  } else if (todayLog && todayLog.is_skipped) {
     statusToday = 'skipped';
+  } else if (todayLog && todayLog.is_justified) {
+    statusToday = 'justified';
   } else if (todayCount >= target) {
     statusToday = 'completed';
   } else if (habit.min_version_enabled && todayCount >= minCount) {
@@ -248,7 +265,6 @@ export function calculateHabitStats(
   } else if (freezesSet.has(todayStr)) {
     statusToday = 'frozen';
   } else if (new Date().getHours() >= dayOffset && todayCount === 0) {
-    // If it's past day offset and nothing is done, it's pending
     statusToday = 'pending';
   }
   

@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg'],
       manifest: {
-        name: 'HabitPro',
-        short_name: 'HabitPro',
+        name: 'Atomic HABITS',
+        short_name: 'Atomic HABITS',
         description: 'Black & White Minimal Atomic Habit Tracker',
         theme_color: '#000000',
         background_color: '#000000',

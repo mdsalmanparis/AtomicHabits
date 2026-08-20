@@ -59,7 +59,7 @@ export const Auth: React.FC = () => {
             <Sparkles className="h-6 w-6" />
           </div>
           <h1 className="text-3xl font-extrabold tracking-tight font-poppins text-text-primary">
-            HABIT<span className="text-neutral-450">PRO</span>
+            Atomic <span className="text-neutral-450 font-medium">HABITS</span>
           </h1>
           <p className="text-sm text-neutral-400 mt-2 font-medium">
             Atomic Habit Tracker

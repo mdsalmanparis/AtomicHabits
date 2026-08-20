@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../supabaseClient';
 import confetti from 'canvas-confetti';
 import { calculateHabitStats, type Habit, getLogicalDate } from '../utils/dateUtils';
+import { getLevelForXP } from '../utils/levelUtils';
 
 export interface Profile {
   id: string;
@@ -883,13 +884,14 @@ export const useStore = create<AppState>((set, get) => ({
     }
 
     if (enabled) {
-      const salahNames = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+      const salahNames = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha', 'Jummah'];
       const missingSalah = salahNames.filter(name => !habits.some(h => h.is_salah && h.name === name));
       
       if (missingSalah.length > 0) {
         const phasesMap: Record<string, string> = {
           'Fajr': 'phase_1',
           'Dhuhr': 'phase_2',
+          'Jummah': 'phase_2',
           'Asr': 'phase_3',
           'Maghrib': 'phase_3',
           'Isha': 'phase_4'
@@ -899,7 +901,7 @@ export const useStore = create<AppState>((set, get) => ({
           user_id: user.id,
           identity: 'a devoted Muslim',
           name: name,
-          icon: name === 'Fajr' ? 'Sunrise' : name === 'Dhuhr' ? 'Sun' : name === 'Asr' ? 'SunDim' : name === 'Maghrib' ? 'Sunset' : 'Moon',
+          icon: name === 'Fajr' ? 'Sunrise' : (name === 'Dhuhr' || name === 'Jummah') ? 'Sun' : name === 'Asr' ? 'SunDim' : name === 'Maghrib' ? 'Sunset' : 'Moon',
           type: 'single_tick',
           target_count: 1,
           frequency_unit: 'daily',
@@ -967,7 +969,7 @@ export const useStore = create<AppState>((set, get) => ({
     if (!user) return;
 
     const newXP = profile.xp + amount;
-    const newLevel = Math.floor(newXP / 200) + 1;
+    const newLevel = getLevelForXP(newXP);
     const leveledUp = newLevel > profile.level;
     
     const updatedProfile = {

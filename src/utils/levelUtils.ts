@@ -1,3 +1,14 @@
+export function getTotalXPForLevel(level: number): number {
+  if (level <= 1) return 0;
+  return 8 * Math.pow(level - 1, 2) + 142 * (level - 1);
+}
+
+export function getLevelForXP(xp: number): number {
+  if (xp <= 0) return 1;
+  const level = Math.floor((-142 + Math.sqrt(20164 + 32 * xp)) / 16) + 1;
+  return Math.max(1, level);
+}
+
 /**
  * Returns a gamified, identity-based title for levels from 1 to 100+.
  */

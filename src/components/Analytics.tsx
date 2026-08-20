@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
-import { calculateHabitStats, getLogicalDate, addDays, getDatesRange } from '../utils/dateUtils';
+import { calculateHabitStats, getLogicalDate, addDays, getDatesRange, isHabitScheduledForDate } from '../utils/dateUtils';
 import { 
   ResponsiveContainer, 
   BarChart, 
@@ -16,7 +16,8 @@ import {
   CartesianGrid
 } from 'recharts';
 import { Trophy, CircleDot, Flame, RefreshCw, Sparkles, Activity, TrendingUp } from 'lucide-react';
-import { getLevelTitle } from '../utils/levelUtils';
+import * as Icons from 'lucide-react';
+import { getLevelTitle, getTotalXPForLevel } from '../utils/levelUtils';
 
 
 
@@ -29,11 +30,13 @@ export const Analytics: React.FC = () => {
   // Level progress XP percentage
   const currentXP = profile.xp;
   const currentLevel = profile.level;
-  const xpBasis = (currentLevel - 1) * 200;
-  const xpNeeded = currentLevel * 200;
+  const xpBasis = getTotalXPForLevel(currentLevel);
+  const xpNeeded = getTotalXPForLevel(currentLevel + 1);
   const currentLevelProgress = currentXP - xpBasis;
   const levelXPNeeded = xpNeeded - xpBasis;
-  const xpPercentage = Math.min(100, Math.round((currentLevelProgress / levelXPNeeded) * 100));
+  const xpPercentage = levelXPNeeded > 0
+    ? Math.min(100, Math.round((Math.max(0, currentLevelProgress) / levelXPNeeded) * 100))
+    : 100;
   const levelTitle = getLevelTitle(currentLevel);
 
   const activeHabits = habits.filter(h => !h.is_archived);
@@ -59,28 +62,41 @@ export const Analytics: React.FC = () => {
   const date28DaysAgo = addDays(todayStr, -27);
   const last28Days = getDatesRange(date28DaysAgo, todayStr);
   
+  const ESTABLISHED_DATE = '2026-08-18';
+  
   const heatmapData = last28Days.map(dateStr => {
+    if (dateStr < ESTABLISHED_DATE) {
+      return {
+        date: dateStr,
+        status: 'not_started' as any,
+        completedCount: 0,
+        minCount: 0,
+        frozenCount: 0,
+        percentage: 0,
+        activeTotal: 0
+      };
+    }
+
     let completedCount = 0;
     let minCount = 0;
     let frozenCount = 0;
-    let activeTotal = activeHabits.length;
+    const scheduledHabits = activeHabits.filter(h => isHabitScheduledForDate(h, dateStr));
+    const activeTotal = scheduledHabits.length;
+    const isFrozen = freezes.some(f => f.logical_date === dateStr);
     
-    activeHabits.forEach(h => {
+    scheduledHabits.forEach(h => {
       const log = logs.find(l => l.habit_id === h.id && l.logical_date === dateStr);
-      const isFrozen = freezes.some(f => f.logical_date === dateStr);
       
       if (log) {
         const target = h.target_count;
         const minVal = h.min_version_enabled ? h.min_version_count : target;
         
-        if (log.is_skipped) {
-          // skipped doesn't count towards completions but doesn't break
+        if (log.is_skipped || log.is_justified) {
+          completedCount++; // Skipped/justified counts as completed for consistency
         } else if (log.count_completed >= target) {
           completedCount++;
         } else if (h.min_version_enabled && log.count_completed >= minVal) {
           minCount++;
-        } else if (isFrozen) {
-          frozenCount++;
         }
       } else if (isFrozen) {
         frozenCount++;
@@ -92,24 +108,217 @@ export const Analytics: React.FC = () => {
       if (completedCount === activeTotal) {
         status = 'completed';
       } else if (completedCount + minCount + frozenCount > 0) {
-        if (frozenCount > 0 && completedCount === 0 && minCount === 0) {
+        if (isFrozen && completedCount === 0 && minCount === 0) {
           status = 'frozen';
         } else {
           status = 'min_version';
         }
       }
+    } else if (isFrozen) {
+      status = 'frozen';
     }
+    
+    const percentage = activeTotal > 0 ? Math.round(((completedCount + minCount) / activeTotal) * 100) : 100;
     
     return {
       date: dateStr,
       status,
       completedCount,
       minCount,
-      frozenCount
+      frozenCount,
+      percentage,
+      activeTotal
     };
   });
 
   const last7Days = last28Days.slice(-7);
+
+  const getDynamicIcon = (iconName: string) => {
+    const IconComponent = (Icons as any)[iconName] || Icons.Check;
+    return <IconComponent className="h-4 w-4 shrink-0 text-text-primary" />;
+  };
+
+
+  // Find most failing non-Salah habits in the last 28 days
+  const nonSalahActiveHabits = activeHabits.filter(h => !h.is_salah);
+  const habitsFailureList = nonSalahActiveHabits.map(h => {
+    let missedCount = 0;
+    let scheduledDays = 0;
+    
+    const creationDateStr = h.created_at ? h.created_at.split('T')[0] : ESTABLISHED_DATE;
+    const startCheckingDate = creationDateStr > ESTABLISHED_DATE ? creationDateStr : ESTABLISHED_DATE;
+    const activeDates = last28Days.filter(dateStr => dateStr >= startCheckingDate && dateStr < todayStr);
+    
+    activeDates.forEach(dateStr => {
+      if (isHabitScheduledForDate(h, dateStr)) {
+        scheduledDays++;
+        const log = logs.find(l => l.habit_id === h.id && l.logical_date === dateStr);
+        const hasFreeze = freezes.some(f => f.habit_id === h.id && f.logical_date === dateStr);
+        
+        if (log) {
+          const count = Number(log.count_completed);
+          const target = Number(h.target_count);
+          const minVal = h.min_version_enabled ? Number(h.min_version_count) : target;
+          const completed = count >= target || (h.min_version_enabled && count >= minVal);
+          
+          if (!completed && !hasFreeze) {
+            missedCount++;
+          }
+        } else if (!hasFreeze) {
+          missedCount++;
+        }
+      }
+    });
+
+    const failureRate = scheduledDays > 0 ? Math.round((missedCount / scheduledDays) * 100) : 0;
+    return {
+      habit: h,
+      missedCount,
+      scheduledDays,
+      failureRate
+    };
+  }).filter(item => item.scheduledDays > 0);
+
+  // Sort descending by missedCount, then by failureRate, filter only missed, limit to max 6
+  const sortedFailureList = [...habitsFailureList]
+    .sort((a, b) => b.missedCount - a.missedCount || b.failureRate - a.failureRate)
+    .filter(item => item.missedCount > 0)
+    .slice(0, 6);
+
+  const mostFailing = sortedFailureList[0];
+  
+
+  const renderAiBlueprint = (text: string) => {
+    const lines = text.split('\n');
+    return (
+      <div className="space-y-3 font-poppins">
+        {lines.map((line, index) => {
+          const trimmed = line.trim();
+          if (!trimmed) return null;
+
+          // Header 2 or bold subtitle lines (e.g. ## Habit-Stacking Formula)
+          if (trimmed.startsWith('##') || (trimmed.startsWith('**') && trimmed.endsWith('**') && !trimmed.startsWith('-'))) {
+            const cleanText = trimmed.replace(/^[#\*\s]+/, '').replace(/[\*]+$/, '');
+            return (
+              <h5 key={index} className="font-extrabold text-[10px] text-text-primary uppercase tracking-wider border-b border-border-primary pb-1 pt-2 animate-fadeIn">
+                {cleanText}
+              </h5>
+            );
+          }
+
+          // Bullet points (e.g. - **Drink 4L Water** -> ...)
+          if (trimmed.startsWith('-') || trimmed.startsWith('*')) {
+            const cleanText = trimmed.replace(/^[\-\*\s]+/, '');
+            
+            // Parse bold elements in bullet point
+            const parts = cleanText.split('**');
+            const parsedContent = parts.map((part, pIdx) => {
+              if (pIdx % 2 === 1) {
+                return <strong key={pIdx} className="font-extrabold text-text-primary">{part}</strong>;
+              }
+              return part;
+            });
+
+            return (
+              <div key={index} className="flex items-start gap-2 text-[11px] text-neutral-600 dark:text-neutral-400 pl-1 mt-1 animate-fadeIn leading-relaxed font-medium">
+                <span className="text-text-primary shrink-0 mt-0.5">•</span>
+                <span>{parsedContent}</span>
+              </div>
+            );
+          }
+
+          // Default text paragraph
+          return (
+            <p key={index} className="text-[11px] text-neutral-500 leading-relaxed font-medium animate-fadeIn">
+              {trimmed}
+            </p>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
+  const [isLoadingAi, setIsLoadingAi] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
+  const askAiCoach = async () => {
+    setIsLoadingAi(true);
+    setAiError(null);
+    setAiResponse(null);
+
+    if (!mostFailing) return;
+
+    const nonSalahSuccessHabits = activeHabits.filter(h => !h.is_salah);
+    const successfulListText = nonSalahSuccessHabits.length > 0
+      ? nonSalahSuccessHabits.map(h => {
+          const stats = calculateHabitStats(h, logs, freezes, profile.day_offset_hours);
+          return `- "${h.name}": ${stats.completionRate}% success rate.`;
+        }).join('\n')
+      : 'None';
+
+    const prompt = `
+I am using a habit tracker based on Atomic Habits by James Clear.
+My single most failing habit is: "${mostFailing.habit.name}".
+My successful habits (which exclude prayer/Salah habits):
+${successfulListText}
+
+Analyze this data and provide a concise, actionable, laser-focused blueprint ONLY for my most failing habit "${mostFailing.habit.name}".
+CRITICAL INSTRUCTIONS:
+- Do NOT mention or suggest any prayer/Salah habits (e.g. Fajr, Dhuhr, Asr, Maghrib, Isha, Jummah).
+- Focus ONLY on "${mostFailing.habit.name}". Do NOT generate stacking formulas or minimum versions for any other habits.
+- Do NOT use any emojis, icons, or unicode symbols (such as 1️⃣, 2️⃣, 🚀, 👍, ✨, etc.) in your entire response.
+- Use only standard text and clean markdown bullet points.
+- Structure your response under exactly two headers:
+  * Habit-Stacking Formula (pairing "${mostFailing.habit.name}" to stack immediately after one of my successful habits listed above)
+  * 2-Minute Minimum Version (a tiny starting version of "${mostFailing.habit.name}" to establish consistency)
+- Use double line breaks between sections for a pretty, clean format.
+- Keep the entire response under 100 words.
+    `;
+
+    try {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_GROQ_API_KEY || ''}`
+        },
+        body: JSON.stringify({
+          model: 'groq/compound-mini',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an elite productivity coach trained in James Clear\'s Atomic Habits methodology. Provide highly actionable, concise advice.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 300
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch from Groq API');
+      }
+
+      const data = await response.json();
+      setAiResponse(data.choices[0].message.content);
+    } catch (err: any) {
+      console.error(err);
+      setAiError('Could not connect to AI Coach. Please check your internet connection.');
+    } finally {
+      setIsLoadingAi(false);
+    }
+  };
+
+  useEffect(() => {
+    if (mostFailing && !aiResponse && !isLoadingAi) {
+      askAiCoach();
+    }
+  }, [mostFailing?.habit.id]);
 
   // 5. Day of the week averages
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -162,8 +371,8 @@ export const Analytics: React.FC = () => {
     completions: `${p.done}/${p.total}`
   }));
 
-  // 28-day historical consistency trend
-  const trendData = last28Days.map(dateStr => {
+  const activeTrendDays = last28Days.filter(dateStr => dateStr >= ESTABLISHED_DATE);
+  const trendData = activeTrendDays.map(dateStr => {
     let completedCount = 0;
     let totalScheduled = 0;
     
@@ -521,27 +730,53 @@ export const Analytics: React.FC = () => {
           
           <div className="grid grid-cols-7 gap-2 select-none">
             {heatmapData.map((day, idx) => {
-              let bgClass = 'bg-bg-primary border border-border-primary';
-              let titleText = `${day.date}: Missed`;
+              const hasCompletions = day.percentage > 0;
+              const isPerfect = day.status === 'completed';
+              const isFrozen = day.status === 'frozen';
+              const isNotStarted = day.status === 'not_started';
               
-              if (day.status === 'completed') {
-                bgClass = 'bg-btn-primary-bg border-btn-primary-bg glow-green';
-                titleText = `${day.date}: Perfect Day`;
+              let borderClass = 'border-border-primary';
+              let titleText = `${day.date}: Missed (0% completed)`;
+              
+              if (isNotStarted) {
+                borderClass = 'border-border-primary/20 opacity-30 cursor-not-allowed';
+                titleText = `${day.date}: App not established yet`;
+              } else if (isPerfect) {
+                borderClass = 'border-btn-primary-bg glow-green';
+                titleText = `${day.date}: Perfect Day (100% completed)`;
               } else if (day.status === 'min_version') {
-                bgClass = 'bg-card-bg border border-border-hover';
-                titleText = `${day.date}: Safety Net Met`;
-              } else if (day.status === 'frozen') {
-                bgClass = 'bg-bg-primary border border-cyan-800';
+                borderClass = 'border-border-hover';
+                titleText = `${day.date}: ${day.percentage}% Completed (Safety Net Met)`;
+              } else if (isFrozen) {
+                borderClass = 'border-cyan-800';
                 titleText = `${day.date}: Streak Frozen`;
+              } else if (day.percentage > 0) {
+                borderClass = 'border-border-hover';
+                titleText = `${day.date}: ${day.percentage}% Completed`;
               }
               
               return (
                 <div 
                   key={idx}
-                  className={`aspect-square rounded-md flex flex-col items-center justify-center text-[8px] font-bold transition-all hover:scale-105 cursor-help ${bgClass}`}
+                  className={`relative aspect-square rounded-md overflow-hidden border bg-bg-primary flex flex-col items-center justify-center text-[10px] font-extrabold font-poppins transition-all hover:scale-105 cursor-help ${borderClass}`}
                   title={titleText}
                 >
-                  <span className={day.status === 'completed' ? 'text-btn-primary-text' : 'text-neutral-500'}>
+                  {/* The water level progress fill */}
+                  {hasCompletions && (
+                    <div 
+                      className={`absolute bottom-0 left-0 right-0 transition-all duration-500 ${
+                        isFrozen 
+                          ? 'bg-cyan-500/20' 
+                          : isPerfect 
+                            ? 'bg-btn-primary-bg' 
+                            : 'bg-btn-primary-bg/15 dark:bg-white/15'
+                      }`}
+                      style={{ height: `${day.percentage}%` }}
+                    />
+                  )}
+                  
+                  {/* The date number */}
+                  <span className={`relative z-10 ${isPerfect && !isFrozen ? 'text-btn-primary-text' : 'text-text-primary'}`}>
                     {day.date.split('-')[2]}
                   </span>
                 </div>
@@ -550,10 +785,10 @@ export const Analytics: React.FC = () => {
           </div>
 
           <div className="flex items-center justify-end gap-3 text-[9px] font-bold tracking-wider text-neutral-500 uppercase pt-2 select-none">
-            <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-bg-primary border border-border-primary" /> Missed</span>
+            <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-bg-primary border border-border-primary" /> Missed (0%)</span>
             <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-bg-primary border border-cyan-800" /> Frozen</span>
-            <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-card-bg border border-border-hover" /> Safety Net</span>
-            <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-btn-primary-bg border border-btn-primary-bg" /> Complete</span>
+            <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-btn-primary-bg/15 dark:bg-white/15 border border-border-hover" /> Partial</span>
+            <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-btn-primary-bg border border-btn-primary-bg" /> 100% Perfect</span>
           </div>
         </div>
 
@@ -645,6 +880,118 @@ export const Analytics: React.FC = () => {
                 No identity habits created yet.
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Habit Diagnostician & Failure Analysis */}
+        <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4 lg:col-span-2 animate-fadeIn">
+          <div className="flex items-center gap-2 select-none border-b border-border-primary pb-3">
+            <Icons.Activity className="h-4 w-4 text-red-500" />
+            <div>
+              <h3 className="text-sm font-extrabold font-poppins text-text-primary">Habit Diagnostician & Failure Analysis</h3>
+              <p className="text-[10px] text-neutral-500">Identify your most missed habits in the last 28 days and get Atomic Habit strategies to succeed</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-1">
+            {/* Left Column: Failure Rates Bar Chart list */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-extrabold font-poppins text-text-primary uppercase tracking-wider">Missed Habits Ranking</h4>
+              <div className="space-y-3.5 max-h-[220px] overflow-y-auto pr-1">
+                {sortedFailureList.map(item => {
+                  const isPerfect = item.missedCount === 0;
+                  return (
+                    <div key={item.habit.id} className="space-y-1.5 animate-fadeIn">
+                      <div className="flex justify-between items-center text-xs">
+                        <div className="flex items-center gap-2">
+                          <div className="p-1 rounded bg-bg-primary border border-border-primary text-text-primary">
+                            {getDynamicIcon(item.habit.icon)}
+                          </div>
+                          <span className="font-extrabold text-text-primary font-poppins">{item.habit.name}</span>
+                        </div>
+                        {isPerfect ? (
+                          <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider bg-emerald-500/10 dark:bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/20">
+                            0% Failure (Perfect)
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-red-500 font-bold uppercase tracking-wider bg-red-500/10 dark:bg-red-500/5 px-2 py-0.5 rounded border border-red-500/20">
+                            Missed {item.missedCount} days ({item.failureRate}% failure)
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="w-full h-2 bg-bg-primary rounded-full overflow-hidden border border-border-primary">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-500 ${isPerfect ? 'bg-emerald-500' : 'bg-red-500'}`}
+                          style={{ width: `${isPerfect ? 100 : item.failureRate}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {sortedFailureList.length === 0 && (
+                  <div className="text-center py-8 text-xs text-neutral-500 font-medium">
+                    <span className="font-bold text-text-primary">Perfect Consistency!</span> No habits missed in the last 28 days.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Column: Tailored Prescription Panel */}
+            <div className="p-4 border border-border-primary rounded-lg bg-bg-primary/50 flex flex-col justify-between min-h-[300px] space-y-4">
+              {mostFailing ? (
+                <>
+                  <div className="flex-1">
+                    {isLoadingAi || (!aiResponse && !aiError) ? (
+                      <div className="h-full flex flex-col items-center justify-center text-center py-16 space-y-3 animate-pulse">
+                        <Icons.Loader2 className="h-6 w-6 animate-spin text-text-primary" />
+                        <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">AI Coach is reading your routine...</span>
+                      </div>
+                    ) : aiResponse ? (
+                      <div className="space-y-3 animate-fadeIn">
+                        <div className="flex items-center gap-2 border-b border-border-primary pb-2">
+                          <Icons.Sparkles className="h-4.5 w-4.5 text-amber-500 fill-amber-500 animate-pulse" />
+                          <div>
+                            <h4 className="text-xs font-black font-poppins text-text-primary">AI Success Blueprint</h4>
+                            <p className="text-[9px] text-neutral-500">James Clear Methodology Coach</p>
+                          </div>
+                        </div>
+                        <div className="bg-card-bg border border-border-primary p-4 rounded-lg max-h-[220px] overflow-y-auto select-text">
+                          {renderAiBlueprint(aiResponse)}
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {aiError && (
+                      <div className="mt-3 p-3 border border-red-500/20 bg-red-500/10 text-red-500 rounded text-[11px] font-bold">
+                        {aiError}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-2 border-t border-border-primary flex items-center justify-end">
+                    {!isLoadingAi && (
+                      <button
+                        onClick={askAiCoach}
+                        className="bg-btn-primary-bg border border-btn-primary-bg text-btn-primary-text font-bold px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity text-[10px] uppercase tracking-wider flex items-center gap-1.5 cursor-pointer shadow-md select-none"
+                      >
+                        <Icons.Sparkles className="h-3 w-3 text-amber-500 fill-amber-500 animate-pulse" />
+                        {aiResponse ? 'Ask AI Again' : 'Consult AI Coach'}
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center space-y-2 py-8">
+                  <Icons.Trophy className="h-8 w-8 text-amber-500 animate-bounce" />
+                  <span className="text-xs font-bold text-text-primary">Perfect Consistency Reached!</span>
+                  <p className="text-[10px] text-neutral-500 max-w-[200px]">
+                    No habits missed in the last 28 days. You have successfully aligned your daily votes with your target identities. Keep going!
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

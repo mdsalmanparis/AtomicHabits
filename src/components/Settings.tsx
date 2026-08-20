@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { getLevelTitle } from '../utils/levelUtils';
+import { getLevelTitle, getTotalXPForLevel } from '../utils/levelUtils';
 import { 
   Trash2, Sun, Moon, FolderArchive, LogOut, 
   Award, CalendarDays, Shield 
@@ -27,8 +27,14 @@ export const Settings: React.FC = () => {
 
   const currentLevel = profile.level;
   const levelTitle = getLevelTitle(currentLevel);
-  const levelXP = profile.xp % 200;
-  const xpPercentage = Math.round((levelXP / 200) * 100);
+  
+  const currentLevelMinXP = getTotalXPForLevel(currentLevel);
+  const nextLevelMinXP = getTotalXPForLevel(currentLevel + 1);
+  const xpInCurrentLevel = profile.xp - currentLevelMinXP;
+  const xpNeededForNextLevel = nextLevelMinXP - currentLevelMinXP;
+  const xpPercentage = xpNeededForNextLevel > 0 
+    ? Math.round((Math.max(0, xpInCurrentLevel) / xpNeededForNextLevel) * 100) 
+    : 100;
 
   const handleBuyShield = () => {
     showConfirm(
@@ -123,7 +129,7 @@ export const Settings: React.FC = () => {
             <div className="space-y-1.5 pt-2">
               <div className="flex justify-between items-center text-[10px] font-bold tracking-wider select-none text-neutral-500 uppercase">
                 <span>XP Progress</span>
-                <span>{levelXP} / 200 XP ({xpPercentage}%)</span>
+                <span>{Math.max(0, xpInCurrentLevel)} / {xpNeededForNextLevel} XP ({xpPercentage}%)</span>
               </div>
               <div className="h-2 w-full rounded-full bg-neutral-200 dark:bg-neutral-800 border border-border-primary overflow-hidden">
                 <div 

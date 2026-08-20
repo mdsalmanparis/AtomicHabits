@@ -212,7 +212,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
           onClick={handleToggleSingle}
           className={`h-12 w-12 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
             isDone
-              ? 'bg-btn-primary-bg border-btn-primary-bg text-btn-primary-text glow-green scale-105'
+              ? 'bg-btn-primary-bg border-btn-primary-bg text-btn-primary-text scale-105 ring-2 ring-emerald-500 ring-offset-2 ring-offset-card-bg shadow-[0_0_12px_rgba(16,185,129,0.2)]'
               : 'bg-bg-primary border-border-primary text-neutral-500 hover:border-border-hover hover:text-text-primary'
           }`}
         >
