@@ -188,6 +188,155 @@ drop policy if exists "Users can insert their own unlocked achievements" on habi
 create policy "Users can insert their own unlocked achievements" on habitpro.user_achievements
   for insert with check (auth.uid() = user_id);
 
+-- Create Sleep Logs table in habitpro
+create table if not exists habitpro.sleep_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  logical_date date not null,
+  start_time text not null,
+  end_time text not null,
+  duration_hours numeric not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_sleep_date unique (user_id, logical_date)
+);
+
+alter table habitpro.sleep_logs enable row level security;
+
+drop policy if exists "Users can perform all actions on their own sleep logs" on habitpro.sleep_logs;
+create policy "Users can perform all actions on their own sleep logs" on habitpro.sleep_logs
+  for all using (auth.uid() = user_id);
+
+-- Create Mood Logs table in habitpro
+create table if not exists habitpro.mood_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  logical_date date not null,
+  phase text not null check (phase in ('phase_1', 'phase_2', 'phase_3', 'phase_4')),
+  mood text not null check (mood in ('hyperactive', 'happy', 'okay', 'sad', 'depressed')),
+  energy text not null check (energy in ('high', 'medium', 'low')),
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_mood_date_phase unique (user_id, logical_date, phase)
+);
+
+alter table habitpro.mood_logs enable row level security;
+
+drop policy if exists "Users can perform all actions on their own mood logs" on habitpro.mood_logs;
+create policy "Users can perform all actions on their own mood logs" on habitpro.mood_logs
+  for all using (auth.uid() = user_id);
+
+-- Create Meditation Logs table in habitpro
+create table if not exists habitpro.meditation_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  logical_date date not null,
+  duration_minutes integer not null default 0,
+  target_minutes integer not null default 15,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_meditation_date unique (user_id, logical_date)
+);
+
+alter table habitpro.meditation_logs enable row level security;
+drop policy if exists "Users can perform all actions on their own meditation logs" on habitpro.meditation_logs;
+create policy "Users can perform all actions on their own meditation logs" on habitpro.meditation_logs
+  for all using (auth.uid() = user_id);
+
+-- Create Yearly Plans table
+create table if not exists habitpro.yearly_plans (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  title text not null,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table habitpro.yearly_plans enable row level security;
+drop policy if exists "Users can perform all actions on their own yearly plans" on habitpro.yearly_plans;
+create policy "Users can perform all actions on their own yearly plans" on habitpro.yearly_plans
+  for all using (auth.uid() = user_id);
+
+-- Create Quarterly Goals table
+create table if not exists habitpro.quarterly_goals (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  yearly_plan_id uuid references habitpro.yearly_plans(id) on delete cascade not null,
+  quarter text not null check (quarter in ('Q1', 'Q2', 'Q3', 'Q4')),
+  title text not null,
+  is_completed boolean not null default false,
+  supporting_habit text,
+  due_date date,
+  current_progress integer not null default 0,
+  total_target integer,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table habitpro.quarterly_goals enable row level security;
+drop policy if exists "Users can perform all actions on their own quarterly goals" on habitpro.quarterly_goals;
+create policy "Users can perform all actions on their own quarterly goals" on habitpro.quarterly_goals
+  for all using (auth.uid() = user_id);
+
+-- Create Milestones table
+create table if not exists habitpro.milestones (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  title text not null,
+  target_date date not null,
+  is_completed boolean not null default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table habitpro.milestones enable row level security;
+drop policy if exists "Users can perform all actions on their own milestones" on habitpro.milestones;
+create policy "Users can perform all actions on their own milestones" on habitpro.milestones
+  for all using (auth.uid() = user_id);
+
+-- Create Weekly Reviews table
+create table if not exists habitpro.weekly_reviews (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  week_start_date date not null,
+  wins text not null default '',
+  challenges text not null default '',
+  next_steps text not null default '',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_weekly_review unique (user_id, week_start_date)
+);
+
+alter table habitpro.weekly_reviews enable row level security;
+drop policy if exists "Users can perform all actions on their own weekly reviews" on habitpro.weekly_reviews;
+create policy "Users can perform all actions on their own weekly reviews" on habitpro.weekly_reviews
+  for all using (auth.uid() = user_id);
+
+-- Create Tomorrow Plans table
+create table if not exists habitpro.tomorrow_plans (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  logical_date date not null,
+  priorities text[] not null,
+  notes text not null default '',
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint unique_user_tomorrow_plan unique (user_id, logical_date)
+);
+
+alter table habitpro.tomorrow_plans enable row level security;
+drop policy if exists "Users can perform all actions on their own tomorrow plans" on habitpro.tomorrow_plans;
+create policy "Users can perform all actions on their own tomorrow plans" on habitpro.tomorrow_plans
+  for all using (auth.uid() = user_id);
+
+-- Create Planner Priorities table
+create table if not exists habitpro.planner_priorities (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references habitpro.profiles(id) on delete cascade not null,
+  title text not null,
+  due_date date not null,
+  is_completed boolean not null default false,
+  is_skipped boolean not null default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table habitpro.planner_priorities enable row level security;
+drop policy if exists "Users can perform all actions on their own planner priorities" on habitpro.planner_priorities;
+create policy "Users can perform all actions on their own planner priorities" on habitpro.planner_priorities
+  for all using (auth.uid() = user_id);
+
 -- Grant privileges on all tables & sequences inside the schema
 grant all privileges on all tables in schema habitpro to anon, authenticated, service_role;
 grant all privileges on all sequences in schema habitpro to anon, authenticated, service_role;

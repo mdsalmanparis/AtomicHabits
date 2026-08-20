@@ -33,6 +33,87 @@ export interface HabitLog {
   xp_earned: number;
 }
 
+export interface SleepLog {
+  id?: string;
+  user_id?: string;
+  logical_date: string;
+  start_time: string;
+  end_time: string;
+  duration_hours: number;
+}
+
+export interface MoodLog {
+  id?: string;
+  user_id?: string;
+  logical_date: string;
+  phase: 'phase_1' | 'phase_2' | 'phase_3' | 'phase_4';
+  mood: 'hyperactive' | 'happy' | 'okay' | 'sad' | 'depressed';
+  energy: 'high' | 'medium' | 'low';
+}
+
+export interface MeditationLog {
+  id?: string;
+  user_id?: string;
+  logical_date: string;
+  duration_minutes: number;
+  target_minutes: number;
+}
+
+export interface YearlyPlan {
+  id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+}
+
+export interface QuarterlyGoal {
+  id: string;
+  user_id: string;
+  yearly_plan_id: string;
+  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  title: string;
+  is_completed: boolean;
+  created_at: string;
+}
+
+export interface Milestone {
+  id: string;
+  user_id: string;
+  title: string;
+  target_date: string;
+  is_completed: boolean;
+  created_at: string;
+}
+
+export interface WeeklyReview {
+  id?: string;
+  user_id?: string;
+  week_start_date: string;
+  wins: string;
+  challenges: string;
+  next_steps: string;
+  created_at?: string;
+}
+
+export interface TomorrowPlan {
+  id?: string;
+  user_id?: string;
+  logical_date: string;
+  priorities: string[];
+  notes: string;
+  created_at?: string;
+}
+
+export interface PlannerPriority {
+  id: string;
+  user_id: string;
+  title: string;
+  due_date: string;
+  is_completed: boolean;
+  is_skipped: boolean;
+  created_at: string;
+}
+
 export interface StreakFreeze {
   logical_date: string;
   habit_id: string;
@@ -59,6 +140,15 @@ interface AppState {
   habits: Habit[];
   logs: HabitLog[];
   freezes: StreakFreeze[];
+  sleepLogs: SleepLog[];
+  moodLogs: MoodLog[];
+  meditationLogs: MeditationLog[];
+  yearlyPlans: YearlyPlan[];
+  quarterlyGoals: QuarterlyGoal[];
+  milestones: Milestone[];
+  weeklyReviews: WeeklyReview[];
+  tomorrowPlans: TomorrowPlan[];
+  plannerPriorities: PlannerPriority[];
   achievements: Achievement[];
   
   theme: 'dark' | 'light';
@@ -82,6 +172,31 @@ interface AppState {
   buyStreakShield: () => Promise<void>;
   useStreakFreeze: (habitId: string, dateStr: string) => Promise<void>;
   toggleSalahTracker: (enabled: boolean) => Promise<void>;
+  logSleep: (startTime: string, endTime: string, logicalDate?: string) => Promise<void>;
+  deleteSleepLog: (logicalDate?: string) => Promise<void>;
+  logMood: (mood: 'hyperactive' | 'happy' | 'okay' | 'sad' | 'depressed', energy: 'high' | 'medium' | 'low', phase: 'phase_1' | 'phase_2' | 'phase_3' | 'phase_4', logicalDate?: string) => Promise<void>;
+  deleteMoodLog: (phase: 'phase_1' | 'phase_2' | 'phase_3' | 'phase_4', logicalDate?: string) => Promise<void>;
+  
+  logMeditation: (durationMinutes: number, targetMinutes: number, logicalDate?: string) => Promise<void>;
+  deleteMeditationLog: (logicalDate?: string) => Promise<void>;
+  
+  addYearlyPlan: (title: string) => Promise<void>;
+  deleteYearlyPlan: (planId: string) => Promise<void>;
+  
+  addQuarterlyGoal: (yearlyPlanId: string, quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4', title: string) => Promise<void>;
+  toggleQuarterlyGoal: (goalId: string, isCompleted: boolean) => Promise<void>;
+  deleteQuarterlyGoal: (goalId: string) => Promise<void>;
+  
+  addMilestone: (title: string, targetDate: string) => Promise<void>;
+  toggleMilestone: (milestoneId: string, isCompleted: boolean) => Promise<void>;
+  deleteMilestone: (milestoneId: string) => Promise<void>;
+  
+  saveWeeklyReview: (weekStartDate: string, wins: string, challenges: string, nextSteps: string) => Promise<void>;
+  saveTomorrowPlan: (logicalDate: string, priorities: string[], notes: string) => Promise<void>;
+  
+  addPlannerPriority: (title: string, dueDate: string) => Promise<void>;
+  togglePlannerPriority: (id: string, updates: { is_completed?: boolean; is_skipped?: boolean }) => Promise<void>;
+  deletePlannerPriority: (id: string) => Promise<void>;
   
   // Helpers
   checkAchievements: () => void;
@@ -150,6 +265,15 @@ export const useStore = create<AppState>((set, get) => ({
   habits: [],
   logs: [],
   freezes: [],
+  sleepLogs: [],
+  moodLogs: [],
+  meditationLogs: [],
+  yearlyPlans: [],
+  quarterlyGoals: [],
+  milestones: [],
+  weeklyReviews: [],
+  tomorrowPlans: [],
+  plannerPriorities: [],
   achievements: STATIC_ACHIEVEMENTS.map(a => ({ ...a })),
   theme: 'dark',
   confirmDialog: {
@@ -286,6 +410,141 @@ export const useStore = create<AppState>((set, get) => ({
           .select('*')
           .eq('user_id', session.user.id);
         set({ freezes: freezes || [] });
+
+        // Fetch Sleep Logs
+        let userSleepLogs: SleepLog[] = [];
+        try {
+          const { data: sleepLogs, error: sleepError } = await supabase
+            .from('sleep_logs')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!sleepError) {
+            userSleepLogs = sleepLogs || [];
+          }
+        } catch (sleepErr) {
+          console.warn('Could not load sleep logs:', sleepErr);
+        }
+        set({ sleepLogs: userSleepLogs });
+
+        // Fetch Mood Logs
+        let userMoodLogs: MoodLog[] = [];
+        try {
+          const { data: moodLogs, error: moodError } = await supabase
+            .from('mood_logs')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!moodError) {
+            userMoodLogs = moodLogs || [];
+          }
+        } catch (moodErr) {
+          console.warn('Could not load mood logs:', moodErr);
+        }
+        set({ moodLogs: userMoodLogs });
+
+        // Fetch Meditation Logs
+        let userMeditationLogs: MeditationLog[] = [];
+        try {
+          const { data: meditationLogs, error: medError } = await supabase
+            .from('meditation_logs')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!medError) {
+            userMeditationLogs = meditationLogs || [];
+          }
+        } catch (medErr) {
+          console.warn('Could not load meditation logs:', medErr);
+        }
+        set({ meditationLogs: userMeditationLogs });
+
+        // Fetch Yearly Plans
+        let userYearlyPlans: YearlyPlan[] = [];
+        try {
+          const { data: yearlyPlans, error: yearlyError } = await supabase
+            .from('yearly_plans')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!yearlyError) {
+            userYearlyPlans = yearlyPlans || [];
+          }
+        } catch (yErr) {
+          console.warn('Could not load yearly plans:', yErr);
+        }
+        set({ yearlyPlans: userYearlyPlans });
+
+        // Fetch Quarterly Goals
+        let userQuarterlyGoals: QuarterlyGoal[] = [];
+        try {
+          const { data: quarterlyGoals, error: quarterlyError } = await supabase
+            .from('quarterly_goals')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!quarterlyError) {
+            userQuarterlyGoals = quarterlyGoals || [];
+          }
+        } catch (qErr) {
+          console.warn('Could not load quarterly goals:', qErr);
+        }
+        set({ quarterlyGoals: userQuarterlyGoals });
+
+        // Fetch Milestones
+        let userMilestones: Milestone[] = [];
+        try {
+          const { data: milestones, error: milestoneError } = await supabase
+            .from('milestones')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!milestoneError) {
+            userMilestones = milestones || [];
+          }
+        } catch (milErr) {
+          console.warn('Could not load milestones:', milErr);
+        }
+        set({ milestones: userMilestones });
+
+        // Fetch Weekly Reviews
+        let userWeeklyReviews: WeeklyReview[] = [];
+        try {
+          const { data: weeklyReviews, error: weeklyError } = await supabase
+            .from('weekly_reviews')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!weeklyError) {
+            userWeeklyReviews = weeklyReviews || [];
+          }
+        } catch (wErr) {
+          console.warn('Could not load weekly reviews:', wErr);
+        }
+        set({ weeklyReviews: userWeeklyReviews });
+
+        // Fetch Tomorrow Plans
+        let userTomorrowPlans: TomorrowPlan[] = [];
+        try {
+          const { data: tomorrowPlans, error: tomorrowError } = await supabase
+            .from('tomorrow_plans')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!tomorrowError) {
+            userTomorrowPlans = tomorrowPlans || [];
+          }
+        } catch (tErr) {
+          console.warn('Could not load tomorrow plans:', tErr);
+        }
+        set({ tomorrowPlans: userTomorrowPlans });
+
+        // Fetch Planner Priorities
+        let userPlannerPriorities: PlannerPriority[] = [];
+        try {
+          const { data: priorities, error: prioritiesError } = await supabase
+            .from('planner_priorities')
+            .select('*')
+            .eq('user_id', session.user.id);
+          if (!prioritiesError) {
+            userPlannerPriorities = priorities || [];
+          }
+        } catch (pErr) {
+          console.warn('Could not load planner priorities:', pErr);
+        }
+        set({ plannerPriorities: userPlannerPriorities });
         
         // Fetch unlocked achievements
         let unlockedIds = new Set<string>();
@@ -341,7 +600,16 @@ export const useStore = create<AppState>((set, get) => ({
       },
       habits: [],
       logs: [],
-      freezes: []
+      freezes: [],
+      sleepLogs: [],
+      moodLogs: [],
+      meditationLogs: [],
+      yearlyPlans: [],
+      quarterlyGoals: [],
+      milestones: [],
+      weeklyReviews: [],
+      tomorrowPlans: [],
+      plannerPriorities: []
     });
   },
 
@@ -1008,6 +1276,436 @@ export const useStore = create<AppState>((set, get) => ({
         }
       }
     }
+  },
+
+  logSleep: async (startTime, endTime, logicalDate) => {
+    const { user, sleepLogs, profile } = get();
+    if (!user) return;
+
+    const targetDate = logicalDate || getLogicalDate(new Date(), profile.day_offset_hours);
+
+    // Calculate duration
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+    const startVal = startH + startM / 60;
+    const endVal = endH + endM / 60;
+    let duration = endVal - startVal;
+    if (duration < 0) {
+      duration += 24; // Cross midnight sleep
+    }
+    duration = Math.round(duration * 100) / 100;
+
+    const { data, error } = await supabase
+      .from('sleep_logs')
+      .upsert({
+        user_id: user.id,
+        logical_date: targetDate,
+        start_time: startTime,
+        end_time: endTime,
+        duration_hours: duration
+      }, { onConflict: 'user_id,logical_date' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error logging sleep:", error);
+      throw error;
+    }
+
+    const filtered = sleepLogs.filter(s => s.logical_date !== targetDate);
+    set({ sleepLogs: [...filtered, data] });
+  },
+
+  deleteSleepLog: async (logicalDate) => {
+    const { user, sleepLogs, profile } = get();
+    if (!user) return;
+
+    const targetDate = logicalDate || getLogicalDate(new Date(), profile.day_offset_hours);
+
+    const { error } = await supabase
+      .from('sleep_logs')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('logical_date', targetDate);
+
+    if (error) {
+      console.error("Error deleting sleep log:", error);
+      throw error;
+    }
+
+    set({ sleepLogs: sleepLogs.filter(s => s.logical_date !== targetDate) });
+  },
+
+  logMood: async (mood, energy, phase, logicalDate) => {
+    const { user, moodLogs, profile } = get();
+    if (!user) return;
+
+    const targetDate = logicalDate || getLogicalDate(new Date(), profile.day_offset_hours);
+
+    const { data, error } = await supabase
+      .from('mood_logs')
+      .upsert({
+        user_id: user.id,
+        logical_date: targetDate,
+        phase,
+        mood,
+        energy
+      }, { onConflict: 'user_id,logical_date,phase' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error logging mood:", error);
+      throw error;
+    }
+
+    const filtered = moodLogs.filter(m => !(m.logical_date === targetDate && m.phase === phase));
+    set({ moodLogs: [...filtered, data] });
+  },
+
+  deleteMoodLog: async (phase, logicalDate) => {
+    const { user, moodLogs, profile } = get();
+    if (!user) return;
+
+    const targetDate = logicalDate || getLogicalDate(new Date(), profile.day_offset_hours);
+
+    const { error } = await supabase
+      .from('mood_logs')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('logical_date', targetDate)
+      .eq('phase', phase);
+
+    if (error) {
+      console.error("Error deleting mood log:", error);
+      throw error;
+    }
+
+    set({ moodLogs: moodLogs.filter(m => !(m.logical_date === targetDate && m.phase === phase)) });
+  },
+
+  logMeditation: async (durationMinutes, targetMinutes, logicalDate) => {
+    const { user, meditationLogs, profile } = get();
+    if (!user) return;
+
+    const targetDate = logicalDate || getLogicalDate(new Date(), profile.day_offset_hours);
+
+    const { data, error } = await supabase
+      .from('meditation_logs')
+      .upsert({
+        user_id: user.id,
+        logical_date: targetDate,
+        duration_minutes: durationMinutes,
+        target_minutes: targetMinutes
+      }, { onConflict: 'user_id,logical_date' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error logging meditation:", error);
+      throw error;
+    }
+
+    const filtered = meditationLogs.filter(m => m.logical_date !== targetDate);
+    set({ meditationLogs: [...filtered, data] });
+  },
+
+  deleteMeditationLog: async (logicalDate) => {
+    const { user, meditationLogs, profile } = get();
+    if (!user) return;
+
+    const targetDate = logicalDate || getLogicalDate(new Date(), profile.day_offset_hours);
+
+    const { error } = await supabase
+      .from('meditation_logs')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('logical_date', targetDate);
+
+    if (error) {
+      console.error("Error deleting meditation log:", error);
+      throw error;
+    }
+
+    set({ meditationLogs: meditationLogs.filter(m => m.logical_date !== targetDate) });
+  },
+
+  addYearlyPlan: async (title) => {
+    const { user, yearlyPlans } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('yearly_plans')
+      .insert({ user_id: user.id, title })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding yearly plan:", error);
+      throw error;
+    }
+
+    set({ yearlyPlans: [...yearlyPlans, data] });
+  },
+
+  deleteYearlyPlan: async (planId) => {
+    const { user, yearlyPlans } = get();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('yearly_plans')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('id', planId);
+
+    if (error) {
+      console.error("Error deleting yearly plan:", error);
+      throw error;
+    }
+
+    set({ yearlyPlans: yearlyPlans.filter(p => p.id !== planId) });
+  },
+
+  addQuarterlyGoal: async (yearlyPlanId, quarter, title) => {
+    const { user, quarterlyGoals } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('quarterly_goals')
+      .insert({
+        user_id: user.id,
+        yearly_plan_id: yearlyPlanId,
+        quarter,
+        title,
+        is_completed: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding quarterly goal:", error);
+      throw error;
+    }
+
+    set({ quarterlyGoals: [...quarterlyGoals, data] });
+  },
+
+  toggleQuarterlyGoal: async (goalId, isCompleted) => {
+    const { user, quarterlyGoals } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('quarterly_goals')
+      .update({ is_completed: isCompleted })
+      .eq('user_id', user.id)
+      .eq('id', goalId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error toggling quarterly goal:", error);
+      throw error;
+    }
+
+    set({
+      quarterlyGoals: quarterlyGoals.map(g => g.id === goalId ? data : g)
+    });
+  },
+
+  deleteQuarterlyGoal: async (goalId) => {
+    const { user, quarterlyGoals } = get();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('quarterly_goals')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('id', goalId);
+
+    if (error) {
+      console.error("Error deleting quarterly goal:", error);
+      throw error;
+    }
+
+    set({ quarterlyGoals: quarterlyGoals.filter(g => g.id !== goalId) });
+  },
+
+  addMilestone: async (title, targetDate) => {
+    const { user, milestones } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('milestones')
+      .insert({
+        user_id: user.id,
+        title,
+        target_date: targetDate,
+        is_completed: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding milestone:", error);
+      throw error;
+    }
+
+    set({ milestones: [...milestones, data] });
+  },
+
+  toggleMilestone: async (milestoneId, isCompleted) => {
+    const { user, milestones } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('milestones')
+      .update({ is_completed: isCompleted })
+      .eq('user_id', user.id)
+      .eq('id', milestoneId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error toggling milestone:", error);
+      throw error;
+    }
+
+    set({
+      milestones: milestones.map(m => m.id === milestoneId ? data : m)
+    });
+  },
+
+  deleteMilestone: async (milestoneId) => {
+    const { user, milestones } = get();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('milestones')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('id', milestoneId);
+
+    if (error) {
+      console.error("Error deleting milestone:", error);
+      throw error;
+    }
+
+    set({ milestones: milestones.filter(m => m.id !== milestoneId) });
+  },
+
+  saveWeeklyReview: async (weekStartDate, wins, challenges, nextSteps) => {
+    const { user, weeklyReviews } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('weekly_reviews')
+      .upsert({
+        user_id: user.id,
+        week_start_date: weekStartDate,
+        wins,
+        challenges,
+        next_steps: nextSteps
+      }, { onConflict: 'user_id,week_start_date' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error saving weekly review:", error);
+      throw error;
+    }
+
+    const filtered = weeklyReviews.filter(w => w.week_start_date !== weekStartDate);
+    set({ weeklyReviews: [...filtered, data] });
+  },
+
+  saveTomorrowPlan: async (logicalDate, priorities, notes) => {
+    const { user, tomorrowPlans } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('tomorrow_plans')
+      .upsert({
+        user_id: user.id,
+        logical_date: logicalDate,
+        priorities,
+        notes
+      }, { onConflict: 'user_id,logical_date' })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error saving tomorrow plan:", error);
+      throw error;
+    }
+
+    const filtered = tomorrowPlans.filter(t => t.logical_date !== logicalDate);
+    set({ tomorrowPlans: [...filtered, data] });
+  },
+
+  addPlannerPriority: async (title, dueDate) => {
+    const { user, plannerPriorities } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('planner_priorities')
+      .insert({
+        user_id: user.id,
+        title,
+        due_date: dueDate,
+        is_completed: false,
+        is_skipped: false
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error adding planner priority:", error);
+      throw error;
+    }
+
+    set({ plannerPriorities: [...plannerPriorities, data] });
+  },
+
+  togglePlannerPriority: async (id, updates) => {
+    const { user, plannerPriorities } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('planner_priorities')
+      .update(updates)
+      .eq('user_id', user.id)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error toggling planner priority:", error);
+      throw error;
+    }
+
+    set({
+      plannerPriorities: plannerPriorities.map(p => p.id === id ? data : p)
+    });
+  },
+
+  deletePlannerPriority: async (id) => {
+    const { user, plannerPriorities } = get();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from('planner_priorities')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('id', id);
+
+    if (error) {
+      console.error("Error deleting planner priority:", error);
+      throw error;
+    }
+
+    set({
+      plannerPriorities: plannerPriorities.filter(p => p.id !== id)
+    });
   },
 
   checkAchievements: () => {
