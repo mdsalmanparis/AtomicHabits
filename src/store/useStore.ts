@@ -73,6 +73,11 @@ export interface QuarterlyGoal {
   quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
   title: string;
   is_completed: boolean;
+  supporting_habit?: string;
+  due_date?: string;
+  current_progress: number;
+  total_target?: number | null;
+  status: 'planned' | 'in-progress' | 'completed' | 'failed';
   created_at: string;
 }
 
@@ -82,6 +87,7 @@ export interface Milestone {
   title: string;
   target_date: string;
   is_completed: boolean;
+  habit_id?: string | null;
   created_at: string;
 }
 
@@ -180,14 +186,15 @@ interface AppState {
   logMeditation: (durationMinutes: number, targetMinutes: number, logicalDate?: string) => Promise<void>;
   deleteMeditationLog: (logicalDate?: string) => Promise<void>;
   
-  addYearlyPlan: (title: string) => Promise<void>;
+  addYearlyPlan: (title: string) => Promise<YearlyPlan>;
   deleteYearlyPlan: (planId: string) => Promise<void>;
   
-  addQuarterlyGoal: (yearlyPlanId: string, quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4', title: string) => Promise<void>;
+  addQuarterlyGoal: (yearlyPlanId: string, quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4', title: string, supportingHabit: string, dueDate: string, totalTarget: number | null) => Promise<void>;
+  updateQuarterlyGoal: (goalId: string, updates: Partial<QuarterlyGoal>) => Promise<void>;
   toggleQuarterlyGoal: (goalId: string, isCompleted: boolean) => Promise<void>;
   deleteQuarterlyGoal: (goalId: string) => Promise<void>;
   
-  addMilestone: (title: string, targetDate: string) => Promise<void>;
+  addMilestone: (title: string, targetDate: string, habitId?: string | null) => Promise<void>;
   toggleMilestone: (milestoneId: string, isCompleted: boolean) => Promise<void>;
   deleteMilestone: (milestoneId: string) => Promise<void>;
   
@@ -1432,7 +1439,7 @@ export const useStore = create<AppState>((set, get) => ({
 
   addYearlyPlan: async (title) => {
     const { user, yearlyPlans } = get();
-    if (!user) return;
+    if (!user) throw new Error("No user authenticated");
 
     const { data, error } = await supabase
       .from('yearly_plans')
@@ -1446,6 +1453,7 @@ export const useStore = create<AppState>((set, get) => ({
     }
 
     set({ yearlyPlans: [...yearlyPlans, data] });
+    return data;
   },
 
   deleteYearlyPlan: async (planId) => {
@@ -1466,7 +1474,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({ yearlyPlans: yearlyPlans.filter(p => p.id !== planId) });
   },
 
-  addQuarterlyGoal: async (yearlyPlanId, quarter, title) => {
+  addQuarterlyGoal: async (yearlyPlanId, quarter, title, supportingHabit, dueDate, totalTarget) => {
     const { user, quarterlyGoals } = get();
     if (!user) return;
 
@@ -1477,7 +1485,12 @@ export const useStore = create<AppState>((set, get) => ({
         yearly_plan_id: yearlyPlanId,
         quarter,
         title,
-        is_completed: false
+        is_completed: false,
+        supporting_habit: supportingHabit || null,
+        due_date: dueDate || null,
+        current_progress: 0,
+        total_target: totalTarget || null,
+        status: 'planned'
       })
       .select()
       .single();
@@ -1488,6 +1501,28 @@ export const useStore = create<AppState>((set, get) => ({
     }
 
     set({ quarterlyGoals: [...quarterlyGoals, data] });
+  },
+
+  updateQuarterlyGoal: async (goalId, updates) => {
+    const { user, quarterlyGoals } = get();
+    if (!user) return;
+
+    const { data, error } = await supabase
+      .from('quarterly_goals')
+      .update(updates)
+      .eq('user_id', user.id)
+      .eq('id', goalId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Error updating quarterly goal:", error);
+      throw error;
+    }
+
+    set({
+      quarterlyGoals: quarterlyGoals.map(g => g.id === goalId ? data : g)
+    });
   },
 
   toggleQuarterlyGoal: async (goalId, isCompleted) => {
@@ -1530,27 +1565,57 @@ export const useStore = create<AppState>((set, get) => ({
     set({ quarterlyGoals: quarterlyGoals.filter(g => g.id !== goalId) });
   },
 
-  addMilestone: async (title, targetDate) => {
+  addMilestone: async (title, targetDate, habitId = null) => {
     const { user, milestones } = get();
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('milestones')
-      .insert({
-        user_id: user.id,
-        title,
-        target_date: targetDate,
-        is_completed: false
-      })
-      .select()
-      .single();
+    let result;
+    let insertErr;
 
-    if (error) {
-      console.error("Error adding milestone:", error);
-      throw error;
+    // Try insert with habit_id
+    if (habitId) {
+      const { data, error } = await supabase
+        .from('milestones')
+        .insert({
+          user_id: user.id,
+          title,
+          target_date: targetDate,
+          is_completed: true,
+          habit_id: habitId
+        })
+        .select()
+        .single();
+      
+      result = data;
+      insertErr = error;
     }
 
-    set({ milestones: [...milestones, data] });
+    // Fallback if no habitId or if insert with habitId failed due to column missing
+    if (!habitId || (insertErr && (insertErr.code === 'PGRST204' || insertErr.message.includes('habit_id')))) {
+      if (habitId) {
+        console.warn("Adding milestone with habit_id failed, retrying without habit_id. Please run the SQL alter script: alter table habitpro.milestones add column if not exists habit_id uuid references habitpro.habits(id) on delete set null;");
+      }
+      const { data, error: retryErr } = await supabase
+        .from('milestones')
+        .insert({
+          user_id: user.id,
+          title,
+          target_date: targetDate,
+          is_completed: true
+        })
+        .select()
+        .single();
+      
+      result = data;
+      insertErr = retryErr;
+    }
+
+    if (insertErr) {
+      console.error("Error adding milestone:", insertErr);
+      throw insertErr;
+    }
+
+    set({ milestones: [...milestones, result] });
   },
 
   toggleMilestone: async (milestoneId, isCompleted) => {

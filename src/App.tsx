@@ -6,7 +6,7 @@ import { Dashboard } from './components/Dashboard';
 import { Analytics } from './components/Analytics';
 import { AchievementsList } from './components/AchievementsList';
 import { Settings } from './components/Settings';
-import { Calendar, BarChart2, Trophy, Loader2, Sliders, Flame } from 'lucide-react';
+import { Calendar, BarChart2, Trophy, Loader2, Sliders, Flame, Target } from 'lucide-react';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -19,7 +19,7 @@ function App() {
   // Initialize phase notifications reminders
   useNotifications();
   
-  const [activeTab, setActiveTab] = useState<'habits' | 'analytics' | 'achievements' | 'settings'>('habits');
+  const [activeTab, setActiveTab] = useState<'habits' | 'growth' | 'analytics' | 'achievements' | 'settings'>('habits');
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
@@ -112,6 +112,17 @@ function App() {
                 <span className="hidden sm:inline">Routines</span>
               </button>
               <button
+                onClick={() => setActiveTab('growth')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-poppins transition-all cursor-pointer ${
+                  activeTab === 'growth' 
+                    ? 'bg-btn-primary-bg text-btn-primary-text font-bold' 
+                    : 'text-neutral-500 hover:text-text-primary'
+                }`}
+              >
+                <Target className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Growth</span>
+              </button>
+              <button
                 onClick={() => setActiveTab('analytics')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-poppins transition-all cursor-pointer ${
                   activeTab === 'analytics' 
@@ -150,7 +161,8 @@ function App() {
 
         {/* Core Workspace Content */}
         <main className="min-h-[60vh]">
-          {activeTab === 'habits' && <Dashboard />}
+          {activeTab === 'habits' && <Dashboard activeTab="habits" />}
+          {activeTab === 'growth' && <Dashboard activeTab="growth" />}
           {activeTab === 'analytics' && <Analytics />}
           {activeTab === 'achievements' && <AchievementsList />}
           {activeTab === 'settings' && <Settings />}

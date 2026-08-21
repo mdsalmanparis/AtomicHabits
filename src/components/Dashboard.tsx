@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
+import type { QuarterlyGoal } from '../store/useStore';
 import { HabitCard } from './HabitCard';
 import { HabitForm } from './HabitForm';
 import { getLogicalDate, formatFriendlyDate, addDays, calculateHabitStats, isHabitScheduledForDate } from '../utils/dateUtils';
@@ -34,10 +35,15 @@ import {
   BookOpen,
   Calendar,
   Trash2,
-  Check
+  Check,
+  Edit2,
+  Ban,
+  Circle
 } from 'lucide-react';
 
-interface DashboardProps {}
+interface DashboardProps {
+  activeTab?: 'habits' | 'growth';
+}
 
 const LIFE_PHASES_META = [
   { id: 'all_day', name: 'All Day / Optional', desc: 'No specific time constraint', icon: Sparkles },
@@ -159,7 +165,7 @@ const CustomCalendarPicker: React.FC<CustomCalendarPickerProps> = ({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="h-10 px-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-xs text-text-primary font-bold flex items-center gap-2 hover:border-neutral-400 transition-colors cursor-pointer select-none"
+        className="cred-input h-10 px-3 rounded-xl text-xs font-bold flex items-center gap-2 transition-colors cursor-pointer select-none"
       >
         <Calendar className="h-4 w-4 text-indigo-500" />
         <span>Due: {value}</span>
@@ -169,7 +175,7 @@ const CustomCalendarPicker: React.FC<CustomCalendarPickerProps> = ({
         <>
           {/* Backdrop */}
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 mt-2 w-64 bg-white dark:bg-neutral-950 border border-border-primary rounded-2xl shadow-xl z-50 p-4 select-none animate-fadeIn">
+          <div className="absolute left-0 mt-2 w-64 bg-card-bg border border-border-primary rounded-xl shadow-xl z-50 p-4 select-none animate-fadeIn">
             {/* Header switcher */}
             <div className="flex justify-between items-center mb-3">
               <button
@@ -232,7 +238,7 @@ const CustomCalendarPicker: React.FC<CustomCalendarPickerProps> = ({
   );
 };
 
-export const Dashboard: React.FC<DashboardProps> = () => {
+export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) => {
   const profile = useStore(state => state.profile);
   const habits = useStore(state => state.habits);
   const logs = useStore(state => state.logs);
@@ -251,16 +257,14 @@ export const Dashboard: React.FC<DashboardProps> = () => {
 
   const yearlyPlans = useStore(state => state.yearlyPlans) || [];
   const addYearlyPlan = useStore(state => state.addYearlyPlan);
-  const deleteYearlyPlan = useStore(state => state.deleteYearlyPlan);
 
   const quarterlyGoals = useStore(state => state.quarterlyGoals) || [];
   const addQuarterlyGoal = useStore(state => state.addQuarterlyGoal);
-  const toggleQuarterlyGoal = useStore(state => state.toggleQuarterlyGoal);
+  const updateQuarterlyGoal = useStore(state => state.updateQuarterlyGoal);
   const deleteQuarterlyGoal = useStore(state => state.deleteQuarterlyGoal);
 
   const milestones = useStore(state => state.milestones) || [];
   const addMilestone = useStore(state => state.addMilestone);
-  const toggleMilestone = useStore(state => state.toggleMilestone);
   const deleteMilestone = useStore(state => state.deleteMilestone);
 
   const weeklyReviews = useStore(state => state.weeklyReviews) || [];
@@ -285,16 +289,29 @@ export const Dashboard: React.FC<DashboardProps> = () => {
   const [groupBy, setGroupBy] = useState<'phase' | 'category' | 'flat'>('phase');
   const [sortBy, setSortBy] = useState<'default' | 'uncompleted' | 'failing' | 'alpha'>('default');
   const [filterBy, setFilterBy] = useState<'all' | 'uncompleted' | 'completed' | 'salah' | 'habits'>('all');
-  const [dashboardTab, setDashboardTab] = useState<'checklist' | 'trackers' | 'planner'>('checklist');
+  const [dashboardTab, setDashboardTab] = useState<'checklist' | 'trackers'>('checklist');
+  const [growthTab, setGrowthTab] = useState<'planner' | 'milestones' | 'review' | 'roadmap'>('planner');
   const [meditationDuration, setMeditationDuration] = useState(0);
   const [meditationTarget, setMeditationTarget] = useState(15);
   const [meditationViewMode, setMeditationViewMode] = useState<'input' | 'chart'>('input');
 
-  const [newYearlyTitle, setNewYearlyTitle] = useState('');
-  const [newQuarterlyTitle, setNewQuarterlyTitle] = useState<Record<string, string>>({});
-  const [newQuarterlyQuarter, setNewQuarterlyQuarter] = useState<Record<string, 'Q1' | 'Q2' | 'Q3' | 'Q4'>>({});
+  const [editingGoalTarget, setEditingGoalTarget] = useState<Record<string, string>>({});
+  const [editingGoalTargetId, setEditingGoalTargetId] = useState<string | null>(null);
+  const [collapsedQuarters, setCollapsedQuarters] = useState<Record<string, boolean>>({});
+  const [activeHabitDropdown, setActiveHabitDropdown] = useState<string | null>(null);
+  const [activeStatusDropdownId, setActiveStatusDropdownId] = useState<string | null>(null);
+  const [editingGoalId, setEditingGoalId] = useState<string | null>(null);
+  const [editGoalTitle, setEditGoalTitle] = useState('');
+  const [editGoalHabit, setEditGoalHabit] = useState('');
+  const [editGoalTarget, setEditGoalTarget] = useState('');
+  const [growthNewTitle, setGrowthNewTitle] = useState('');
+  const [growthNewQuarter, setGrowthNewQuarter] = useState('Q3-2026');
+  const [growthNewHabit, setGrowthNewHabit] = useState('');
+  const [growthNewTarget, setGrowthNewTarget] = useState('');
+  const [growthActiveHabitDropdown, setGrowthActiveHabitDropdown] = useState(false);
   const [newMilestoneTitle, setNewMilestoneTitle] = useState('');
   const [newMilestoneDate, setNewMilestoneDate] = useState('');
+  const [newMilestoneHabit, setNewMilestoneHabit] = useState('');
   const [reviewWins, setReviewWins] = useState('');
   const [reviewChallenges, setReviewChallenges] = useState('');
   const [reviewNextSteps, setReviewNextSteps] = useState('');
@@ -386,7 +403,7 @@ export const Dashboard: React.FC<DashboardProps> = () => {
   }, [currentWeeklyReview, selectedDate]);
 
   useEffect(() => {
-    setNewPriorityDueDate(addDays(selectedDate, 1));
+    setNewPriorityDueDate(selectedDate);
   }, [selectedDate]);
 
 
@@ -759,8 +776,10 @@ export const Dashboard: React.FC<DashboardProps> = () => {
   return (
     <div className="space-y-6 font-sans selection:bg-text-primary selection:text-bg-primary transition-colors">
       
-      {/* Top Header Card */}
-      <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
+      {activeTab === 'habits' && (
+        <>
+          {/* Top Header Card */}
+          <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           {/* Identity Title & Progress Ring */}
           <div className="flex items-center gap-4">
@@ -911,42 +930,1021 @@ export const Dashboard: React.FC<DashboardProps> = () => {
           );
         })}
       </div>
+        </>
+      )}
 
       {/* Dashboard Tab Selector */}
-      <div className="flex border-b border-border-primary/50 gap-4 mb-4 select-none">
-        <button
-          onClick={() => setDashboardTab('checklist')}
-          className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
-            dashboardTab === 'checklist'
-              ? 'border-indigo-500 text-indigo-500'
-              : 'border-transparent text-neutral-500 hover:text-neutral-400'
-          }`}
-        >
-          Checklist ({processedHabits.length})
-        </button>
-        <button
-          onClick={() => setDashboardTab('trackers')}
-          className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
-            dashboardTab === 'trackers'
-              ? 'border-indigo-500 text-indigo-500'
-              : 'border-transparent text-neutral-500 hover:text-neutral-400'
-          }`}
-        >
-          Wellbeing Trackers
-        </button>
-        <button
-          onClick={() => setDashboardTab('planner')}
-          className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
-            dashboardTab === 'planner'
-              ? 'border-indigo-500 text-indigo-500'
-              : 'border-transparent text-neutral-500 hover:text-neutral-400'
-          }`}
-        >
-          Growth Planner
-        </button>
-      </div>
+      {activeTab === 'habits' && (
+        <div className="flex border-b border-border-primary/50 gap-4 mb-4 select-none">
+          <button
+            onClick={() => setDashboardTab('checklist')}
+            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+              dashboardTab === 'checklist'
+                ? 'border-indigo-500 text-indigo-500'
+                : 'border-transparent text-neutral-500 hover:text-neutral-400'
+            }`}
+          >
+            Routines ({processedHabits.length})
+          </button>
+          <button
+            onClick={() => setDashboardTab('trackers')}
+            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+              dashboardTab === 'trackers'
+                ? 'border-indigo-500 text-indigo-500'
+                : 'border-transparent text-neutral-500 hover:text-neutral-400'
+            }`}
+          >
+            Wellbeing Trackers
+          </button>
+        </div>
+      )}
 
-      {dashboardTab === 'trackers' ? (
+      {activeTab === 'growth' && (
+        <div className="flex border-b border-border-primary/50 gap-4 mb-4 select-none">
+          <button
+            onClick={() => setGrowthTab('planner')}
+            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+              growthTab === 'planner'
+                ? 'border-indigo-500 text-indigo-500'
+                : 'border-transparent text-neutral-500 hover:text-neutral-400'
+            }`}
+          >
+            Planner
+          </button>
+          <button
+            onClick={() => setGrowthTab('milestones')}
+            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+              growthTab === 'milestones'
+                ? 'border-indigo-500 text-indigo-500'
+                : 'border-transparent text-neutral-500 hover:text-neutral-400'
+            }`}
+          >
+            Milestone
+          </button>
+          <button
+            onClick={() => setGrowthTab('review')}
+            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+              growthTab === 'review'
+                ? 'border-indigo-500 text-indigo-500'
+                : 'border-transparent text-neutral-500 hover:text-neutral-400'
+            }`}
+          >
+            Review
+          </button>
+          <button
+            onClick={() => setGrowthTab('roadmap')}
+            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+              growthTab === 'roadmap'
+                ? 'border-indigo-500 text-indigo-500'
+                : 'border-transparent text-neutral-500 hover:text-neutral-400'
+            }`}
+          >
+            Roadmap
+          </button>
+        </div>
+      )}
+
+      {activeTab === 'growth' ? (
+        growthTab === 'roadmap' ? (
+          <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn py-2 select-none">
+            {/* Header */}
+            <div className="border-b border-border-primary pb-4 select-none">
+              <h1 className="text-2xl font-black font-poppins text-text-primary uppercase tracking-wider">
+                Strategic Growth Roadmap
+              </h1>
+              <p className="text-[10.5px] text-neutral-500 font-bold uppercase tracking-widest mt-1">
+                Release Objective Tracking • Q3 2026 — Q2 2027
+              </p>
+            </div>
+
+          {/* Add Form Container */}
+          <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4 shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 shrink-0">
+                <Target className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold font-poppins text-text-primary uppercase tracking-wider">
+                  Create Objective
+                </h3>
+                <p className="text-[10px] text-neutral-500 font-semibold tracking-wide uppercase mt-0.5">
+                  Set high impact milestones for the year ahead
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9.5px] font-black uppercase tracking-wider text-neutral-500">Objective Title</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Complete Advanced React Course..."
+                    value={growthNewTitle}
+                    onChange={(e) => setGrowthNewTitle(e.target.value)}
+                    className="cred-input w-full h-10 px-4 rounded-xl text-xs font-bold outline-none transition-all"
+                  />
+                </div>
+                
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9.5px] font-black uppercase tracking-wider text-neutral-500">Target Frequency (Optional)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 50 (practices)"
+                    value={growthNewTarget}
+                    onChange={(e) => setGrowthNewTarget(e.target.value)}
+                    className="cred-input w-full h-10 px-4 rounded-xl text-xs font-bold outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9.5px] font-black uppercase tracking-wider text-neutral-500">Target Quarter</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { key: 'Q3-2026', quarter: 'Q3', year: '2026', activeClass: 'bg-rose-500 border-rose-500 text-white shadow-md shadow-rose-500/20' },
+                      { key: 'Q4-2026', quarter: 'Q4', year: '2026', activeClass: 'bg-indigo-500 border-indigo-500 text-white shadow-md shadow-indigo-500/20' },
+                      { key: 'Q1-2027', quarter: 'Q1', year: '2027', activeClass: 'bg-emerald-500 border-emerald-500 text-white shadow-md shadow-emerald-500/20' },
+                      { key: 'Q2-2027', quarter: 'Q2', year: '2027', activeClass: 'bg-sky-500 border-sky-500 text-white shadow-md shadow-sky-500/20' }
+                    ].map(qOpt => (
+                      <button
+                        key={qOpt.key}
+                        type="button"
+                        onClick={() => setGrowthNewQuarter(qOpt.key)}
+                        className={`h-10 rounded-xl border text-[10px] font-black uppercase tracking-wider transition-all select-none cursor-pointer ${
+                          growthNewQuarter === qOpt.key
+                            ? qOpt.activeClass
+                            : 'bg-neutral-50 border-border-primary text-neutral-500 hover:border-border-hover dark:bg-neutral-900/40'
+                        }`}
+                      >
+                        {qOpt.quarter} {qOpt.year}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-[9.5px] font-black uppercase tracking-wider text-neutral-500">Supporting Habit</label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setGrowthActiveHabitDropdown(!growthActiveHabitDropdown)}
+                      className="cred-input w-full h-10 px-4 rounded-xl text-xs font-bold flex items-center justify-between transition-colors cursor-pointer select-none"
+                    >
+                      <span>{growthNewHabit || 'No Supporting Habit'}</span>
+                      <ChevronDown className="h-4 w-4 text-neutral-500" />
+                    </button>
+
+                    {growthActiveHabitDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setGrowthActiveHabitDropdown(false)} />
+                        <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white dark:bg-neutral-950 border border-border-primary rounded-xl shadow-lg z-50 p-1 select-none animate-fadeIn">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setGrowthNewHabit('');
+                              setGrowthActiveHabitDropdown(false);
+                            }}
+                            className="w-full text-left px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-900 text-xs font-semibold text-text-primary rounded-lg transition-colors cursor-pointer"
+                          >
+                            No Supporting Habit
+                          </button>
+                          {habits.map(h => (
+                            <button
+                              key={h.id}
+                              type="button"
+                              onClick={() => {
+                                setGrowthNewHabit(h.name);
+                                setGrowthActiveHabitDropdown(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-900 text-xs font-semibold text-text-primary rounded-lg transition-colors cursor-pointer"
+                            >
+                              {h.name}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                disabled={!growthNewTitle.trim()}
+                onClick={async () => {
+                  const stableList = [
+                    { key: 'Q3-2026', quarter: 'Q3', year: '2026', dueDate: '2026-09-30' },
+                    { key: 'Q4-2026', quarter: 'Q4', year: '2026', dueDate: '2026-12-31' },
+                    { key: 'Q1-2027', quarter: 'Q1', year: '2027', dueDate: '2027-03-31' },
+                    { key: 'Q2-2027', quarter: 'Q2', year: '2027', dueDate: '2027-06-30' }
+                  ];
+                  const activeQ = stableList.find(qOpt => qOpt.key === growthNewQuarter);
+                  if (activeQ && growthNewTitle.trim()) {
+                    let yearPlan = yearlyPlans.find(p => p.title === activeQ.year);
+                    if (!yearPlan) {
+                      yearPlan = await addYearlyPlan(activeQ.year);
+                    }
+                    const targetVal = growthNewTarget ? parseInt(growthNewTarget, 10) : null;
+                    addQuarterlyGoal(yearPlan.id, activeQ.quarter as any, growthNewTitle, growthNewHabit, activeQ.dueDate, targetVal);
+                    setGrowthNewTitle('');
+                    setGrowthNewHabit('');
+                    setGrowthNewTarget('');
+                  }
+                }}
+                className="h-10 px-6 bg-indigo-600 hover:bg-indigo-750 text-white font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none shadow-md shadow-indigo-500/20 active:scale-95"
+              >
+                Save Objective
+              </button>
+            </div>
+          </div>
+
+          {/* Quarters Stack */}
+          <div className="space-y-4">
+            {[
+              { key: 'Q3-2026', quarter: 'Q3', year: '2026', label: 'Q3 2026 (Jul-Sep)', dueDate: '2026-09-30', dueDateLabel: 'Sep 30, 2026', colorClass: 'text-rose-500 dark:text-rose-400', bgClass: 'bg-rose-500/10 border-rose-500/20 dark:border-rose-500/30', accent: 'rose' },
+              { key: 'Q4-2026', quarter: 'Q4', year: '2026', label: 'Q4 2026 (Oct-Dec)', dueDate: '2026-12-31', dueDateLabel: 'Dec 31, 2026', colorClass: 'text-indigo-500 dark:text-indigo-400', bgClass: 'bg-indigo-500/10 border-indigo-500/20 dark:border-indigo-500/30', accent: 'indigo' },
+              { key: 'Q1-2027', quarter: 'Q1', year: '2027', label: 'Q1 2027 (Jan-Mar)', dueDate: '2027-03-31', dueDateLabel: 'Mar 31, 2027', colorClass: 'text-emerald-500 dark:text-emerald-400', bgClass: 'bg-emerald-500/10 border-emerald-500/20 dark:border-emerald-500/30', accent: 'emerald' },
+              { key: 'Q2-2027', quarter: 'Q2', year: '2027', label: 'Q2 2027 (Apr-Jun)', dueDate: '2027-06-30', dueDateLabel: 'Jun 30, 2027', colorClass: 'text-sky-500 dark:text-sky-400', bgClass: 'bg-sky-500/10 border-sky-500/20 dark:border-sky-500/30', accent: 'sky' }
+            ].map(qOpt => {
+              const yearPlan = yearlyPlans.find(p => p.title === qOpt.year);
+              const qGoals = yearPlan ? quarterlyGoals.filter(g => g.yearly_plan_id === yearPlan.id && g.quarter === qOpt.quarter) : [];
+              
+              const hasGoals = qGoals.length > 0;
+              const allCompleted = hasGoals && qGoals.every(g => g.status === 'completed' || g.is_completed);
+              const isCollapsed = collapsedQuarters[qOpt.key] !== undefined ? collapsedQuarters[qOpt.key] : (hasGoals && allCompleted);
+
+              const completedCount = qGoals.filter(g => g.status === 'completed' || g.is_completed).length;
+
+              return (
+                <div key={qOpt.key} className="cred-card p-6 rounded-xl border border-border-primary space-y-4 shadow-sm">
+                  {/* Quarter Header */}
+                  <div className="flex justify-between items-center select-none pb-2 border-b border-border-primary/50">
+                    <button
+                      onClick={() => setCollapsedQuarters(prev => ({ ...prev, [qOpt.key]: !isCollapsed }))}
+                      className="flex items-center gap-2.5 text-xs font-black text-text-primary hover:opacity-80 transition-opacity cursor-pointer uppercase tracking-wider text-left"
+                    >
+                      <span className="text-[10px] text-neutral-400">{isCollapsed ? '▶' : '▼'}</span>
+                      <span className={`${qOpt.colorClass}`}>{qOpt.label}</span>
+                      <span className="text-[9px] text-neutral-450 font-bold lowercase bg-neutral-100 dark:bg-neutral-900 border border-border-primary px-2.5 py-0.5 rounded-full">
+                        Due by {qOpt.dueDateLabel}
+                      </span>
+                      {hasGoals && (
+                        <span className={`text-[8.5px] font-black uppercase px-2 py-0.5 rounded-full ${
+                          allCompleted 
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                            : 'bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-neutral-500'
+                        }`}>
+                          {completedCount}/{qGoals.length} Done
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Collapsible Objectives List */}
+                  {!isCollapsed && (
+                    <div className="space-y-3 pt-2">
+                      {qGoals.length > 0 ? (
+                        qGoals.map(goal => {
+                          const percent = goal.total_target ? Math.min(100, Math.round((goal.current_progress / goal.total_target) * 100)) : 0;
+                          const isEditingTarget = editingGoalTargetId === goal.id;
+                          const isEditingGoal = editingGoalId === goal.id;
+
+                          const handleToggleComplete = () => {
+                            const isComp = !goal.is_completed;
+                            const updates: Partial<QuarterlyGoal> = {
+                              is_completed: isComp,
+                              status: isComp ? 'completed' : (goal.current_progress > 0 ? 'in-progress' : 'planned')
+                            };
+                            updateQuarterlyGoal(goal.id, updates);
+                          };
+
+                          const handleIncrement = () => {
+                            const nextProgress = goal.current_progress + 1;
+                            const updates: Partial<QuarterlyGoal> = { current_progress: nextProgress };
+                            if (goal.status === 'planned') {
+                              updates.status = 'in-progress';
+                            }
+                            if (goal.total_target && nextProgress >= goal.total_target && goal.status !== 'completed') {
+                              updates.status = 'completed';
+                              updates.is_completed = true;
+                            }
+                            updateQuarterlyGoal(goal.id, updates);
+                          };
+
+                          const handleDecrement = () => {
+                            const nextProgress = Math.max(0, goal.current_progress - 1);
+                            const updates: Partial<QuarterlyGoal> = { current_progress: nextProgress };
+                            if (nextProgress === 0 && goal.status === 'in-progress') {
+                              updates.status = 'planned';
+                            }
+                            if (goal.total_target && nextProgress < goal.total_target && goal.status === 'completed') {
+                              updates.status = 'in-progress';
+                              updates.is_completed = false;
+                            }
+                            updateQuarterlyGoal(goal.id, updates);
+                          };
+
+                          return (
+                            <div key={goal.id} className="p-4 bg-white/40 dark:bg-neutral-900/40 border border-border-primary/50 rounded-2xl space-y-3 hover:border-border-primary transition-all">
+                              {isEditingGoal ? (
+                                <div className="space-y-3 animate-fadeIn">
+                                  <span className="text-[9px] font-black uppercase text-neutral-500 tracking-wider block">
+                                    Edit Objective Details
+                                  </span>
+                                  <input
+                                    type="text"
+                                    value={editGoalTitle}
+                                    onChange={(e) => setEditGoalTitle(e.target.value)}
+                                    className="w-full h-9 px-3 bg-white dark:bg-neutral-950 border border-border-primary rounded-xl text-xs text-text-primary font-bold outline-none focus:border-indigo-500"
+                                  />
+                                  
+                                  {/* Editor Habit Selection Dropdown */}
+                                  <div className="relative">
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveHabitDropdown(activeHabitDropdown === goal.id ? null : goal.id)}
+                                      className="w-full h-9 px-3 bg-white dark:bg-neutral-955 border border-border-primary rounded-xl text-xs text-text-primary font-bold flex items-center justify-between hover:border-neutral-400 transition-colors cursor-pointer select-none"
+                                    >
+                                      <span>{editGoalHabit || 'No Supporting Habit'}</span>
+                                      <ChevronDown className="h-4 w-4 text-neutral-500" />
+                                    </button>
+
+                                    {activeHabitDropdown === goal.id && (
+                                      <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setActiveHabitDropdown(null)} />
+                                        <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white dark:bg-neutral-950 border border-border-primary rounded-xl shadow-lg z-50 p-1 select-none animate-fadeIn">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setEditGoalHabit('');
+                                              setActiveHabitDropdown(null);
+                                            }}
+                                            className="w-full text-left px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-900 text-xs font-semibold text-text-primary rounded-lg transition-colors cursor-pointer"
+                                          >
+                                            No Supporting Habit
+                                          </button>
+                                          {habits.map(h => (
+                                            <button
+                                              key={h.id}
+                                              type="button"
+                                              onClick={() => {
+                                                setEditGoalHabit(h.name);
+                                                setActiveHabitDropdown(null);
+                                              }}
+                                              className="w-full text-left px-3 py-2 hover:bg-neutral-50 dark:hover:bg-neutral-900 text-xs font-semibold text-text-primary rounded-lg transition-colors cursor-pointer"
+                                            >
+                                              {h.name}
+                                            </button>
+                                          ))}
+                                        </div>
+                                      </>
+                                    )}
+                                  </div>
+
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={editGoalTarget}
+                                    onChange={(e) => setEditGoalTarget(e.target.value)}
+                                    placeholder="Target frequency count..."
+                                    className="w-full h-9 px-3 bg-white dark:bg-neutral-955 border border-border-primary rounded-xl text-xs text-text-primary font-bold outline-none focus:border-indigo-500"
+                                  />
+                                  <div className="flex justify-end gap-2 pt-1">
+                                    <button
+                                      onClick={() => setEditingGoalId(null)}
+                                      className="h-8 px-3.5 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-text-primary border border-border-primary rounded-lg text-[9.5px] font-bold uppercase tracking-wider cursor-pointer"
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        const updatedTarget = editGoalTarget ? parseInt(editGoalTarget, 10) : null;
+                                        updateQuarterlyGoal(goal.id, {
+                                          title: editGoalTitle,
+                                          supporting_habit: editGoalHabit || undefined,
+                                          total_target: updatedTarget
+                                        });
+                                        setEditingGoalId(null);
+                                      }}
+                                      disabled={!editGoalTitle.trim()}
+                                      className="h-8 px-4 bg-indigo-650 hover:bg-indigo-700 text-white border border-indigo-600 rounded-lg text-[9.5px] font-bold uppercase tracking-wider cursor-pointer"
+                                    >
+                                      Save
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  {/* Main row: checkbox, details, status & action buttons */}
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-start gap-3">
+                                      <button
+                                        onClick={handleToggleComplete}
+                                        className={`h-5 w-5 rounded-lg border flex items-center justify-center transition-all cursor-pointer shrink-0 mt-0.5 ${
+                                          goal.status === 'completed' || goal.is_completed
+                                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm shadow-emerald-500/25'
+                                            : 'border-border-primary text-neutral-400 hover:border-neutral-500 dark:bg-neutral-950'
+                                        }`}
+                                      >
+                                        {(goal.status === 'completed' || goal.is_completed) && <Check className="h-3 w-3 stroke-[3px]" />}
+                                      </button>
+                                      <div>
+                                        <h4 className={`text-xs font-bold text-text-primary leading-tight ${goal.status === 'completed' || goal.is_completed ? 'line-through opacity-50' : ''}`}>
+                                          {goal.title}
+                                        </h4>
+                                        {goal.supporting_habit && (
+                                          <div className="flex items-center gap-1.5 mt-1 select-none">
+                                            <span className="text-[9px] font-bold text-neutral-400 uppercase tracking-wide">Supporting:</span>
+                                            <span className="text-[9.5px] font-black uppercase text-indigo-500 dark:text-indigo-400">
+                                              {goal.supporting_habit}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Right side alignment: Status pill & edit/delete buttons */}
+                                    <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                                      {/* Status Switcher Badge */}
+                                      <div className="relative">
+                                        <button
+                                          onClick={() => setActiveStatusDropdownId(activeStatusDropdownId === goal.id ? null : goal.id)}
+                                          className={`text-[8.5px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                            goal.status === 'completed'
+                                              ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
+                                              : goal.status === 'in-progress'
+                                              ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400'
+                                              : goal.status === 'failed'
+                                              ? 'bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-455'
+                                              : 'bg-neutral-100 dark:bg-neutral-800 border-border-primary text-neutral-600 dark:text-neutral-400'
+                                          }`}
+                                        >
+                                          <span className={`w-1.5 h-1.5 rounded-full ${
+                                            goal.status === 'completed' ? 'bg-emerald-500' :
+                                            goal.status === 'in-progress' ? 'bg-amber-500' :
+                                            goal.status === 'failed' ? 'bg-rose-500' : 'bg-neutral-400'
+                                          }`} />
+                                          <span>{goal.status ? goal.status.replace('-', ' ') : 'planned'}</span>
+                                        </button>
+
+                                        {activeStatusDropdownId === goal.id && (
+                                          <>
+                                            <div className="fixed inset-0 z-40" onClick={() => setActiveStatusDropdownId(null)} />
+                                            <div className="absolute right-0 mt-1 w-32 bg-white dark:bg-neutral-955 border border-border-primary rounded-xl shadow-lg z-50 p-1 select-none animate-fadeIn">
+                                              {[
+                                                { val: 'planned', label: 'Planned', color: 'bg-neutral-450' },
+                                                { val: 'in-progress', label: 'In Progress', color: 'bg-amber-500' },
+                                                { val: 'completed', label: 'Completed', color: 'bg-emerald-500' },
+                                                { val: 'failed', label: 'Failed', color: 'bg-rose-500' }
+                                              ].map(opt => (
+                                                <button
+                                                  key={opt.val}
+                                                  onClick={() => {
+                                                    updateQuarterlyGoal(goal.id, {
+                                                      status: opt.val as any,
+                                                      is_completed: opt.val === 'completed'
+                                                    });
+                                                    setActiveStatusDropdownId(null);
+                                                  }}
+                                                  className={`w-full text-left px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-colors cursor-pointer flex items-center gap-2 hover:bg-neutral-100 dark:hover:bg-neutral-900 ${
+                                                    goal.status === opt.val ? 'bg-neutral-50 dark:bg-neutral-900 font-extrabold' : 'text-text-primary'
+                                                  }`}
+                                                >
+                                                  <span className={`w-1.5 h-1.5 rounded-full ${opt.color}`} />
+                                                  <span>{opt.label}</span>
+                                                </button>
+                                              ))}
+                                            </div>
+                                          </>
+                                        )}
+                                      </div>
+
+                                      {/* Done Visual Text Indicator */}
+                                      {(goal.status === 'completed' || goal.is_completed) && (
+                                        <span className="text-[8.5px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded-full border border-emerald-500/10">
+                                          ✓ COMPLETED
+                                        </span>
+                                      )}
+
+                                      {/* Edit & Delete Action Buttons */}
+                                      <div className="flex items-center border-l border-border-primary/50 pl-2 gap-1">
+                                        <button
+                                          onClick={() => {
+                                            setEditingGoalId(goal.id);
+                                            setEditGoalTitle(goal.title);
+                                            setEditGoalHabit(goal.supporting_habit || '');
+                                            setEditGoalTarget(goal.total_target ? String(goal.total_target) : '');
+                                          }}
+                                          className="text-neutral-405 hover:text-indigo-500 transition-colors p-1"
+                                        >
+                                          <Edit2 className="h-3.5 w-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={() => deleteQuarterlyGoal(goal.id)}
+                                          className="text-neutral-405 hover:text-red-500 transition-colors p-1"
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Progress Counters Section */}
+                                  {goal.status === 'in-progress' && (
+                                    <div className="p-3 bg-neutral-50/50 dark:bg-neutral-900/60 border border-border-primary/50 rounded-xl space-y-2.5 animate-fadeIn">
+                                      <div className="flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2">
+                                          <button
+                                            onClick={handleDecrement}
+                                            className="h-7 w-7 rounded-lg bg-white dark:bg-neutral-800 border border-border-primary hover:bg-neutral-100 dark:hover:bg-neutral-700 text-text-primary text-xs font-bold flex items-center justify-center cursor-pointer select-none transition-colors"
+                                          >
+                                            -
+                                          </button>
+
+                                          <span className="text-[11px] font-semibold text-neutral-500 dark:text-neutral-400 font-poppins px-1">
+                                            {goal.total_target ? (
+                                              <>
+                                                Progress: <span className={`font-extrabold ${qOpt.colorClass}`}>{goal.current_progress}</span> / {goal.total_target}
+                                              </>
+                                            ) : (
+                                              <>
+                                                Count: <span className={`font-extrabold ${qOpt.colorClass}`}>{goal.current_progress}</span>
+                                              </>
+                                            )}
+                                          </span>
+
+                                          <button
+                                            onClick={handleIncrement}
+                                            className="h-7 w-7 rounded-lg bg-white dark:bg-neutral-800 border border-border-primary hover:bg-neutral-100 dark:hover:bg-neutral-700 text-text-primary text-xs font-bold flex items-center justify-center cursor-pointer select-none transition-colors"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
+
+                                        <div className="text-right">
+                                          {isEditingTarget ? (
+                                            <div className="flex items-center gap-1 animate-fadeIn">
+                                              <input
+                                                type="number"
+                                                min="1"
+                                                value={editingGoalTarget[goal.id] || ''}
+                                                onChange={(e) => setEditingGoalTarget(prev => ({ ...prev, [goal.id]: e.target.value }))}
+                                                placeholder="Target"
+                                                className="w-14 h-7 px-2 bg-white dark:bg-neutral-950 border border-border-primary rounded-lg text-xs text-text-primary font-bold outline-none text-center"
+                                              />
+                                              <button
+                                                onClick={() => {
+                                                  const targetVal = editingGoalTarget[goal.id];
+                                                  const parsed = targetVal ? parseInt(targetVal, 10) : null;
+                                                  updateQuarterlyGoal(goal.id, { total_target: parsed });
+                                                  setEditingGoalTargetId(null);
+                                                }}
+                                                className={`px-2 h-7 text-white font-extrabold text-[9px] uppercase tracking-wider rounded-lg cursor-pointer transition-colors ${
+                                                  qOpt.accent === 'rose' ? 'bg-rose-500 hover:bg-rose-600' :
+                                                  qOpt.accent === 'indigo' ? 'bg-indigo-500 hover:bg-indigo-600' :
+                                                  qOpt.accent === 'emerald' ? 'bg-emerald-500 hover:bg-emerald-600' :
+                                                  'bg-sky-500 hover:bg-sky-600'
+                                                }`}
+                                              >
+                                                Set
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <button
+                                              onClick={() => {
+                                                setEditingGoalTargetId(goal.id);
+                                                setEditingGoalTarget(prev => ({ ...prev, [goal.id]: goal.total_target ? String(goal.total_target) : '' }));
+                                              }}
+                                              className="text-[9px] font-black uppercase text-indigo-500 hover:text-indigo-400 cursor-pointer tracking-wider"
+                                            >
+                                              {goal.total_target ? 'Edit Target' : '+ Add Target'}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      {/* Progress Bar (visible for in-progress objectives with a set target) */}
+                                      {goal.total_target && (
+                                        <div className="w-full bg-neutral-200 dark:bg-neutral-850 rounded-full h-1.5 select-none overflow-hidden border border-border-primary/20">
+                                          <div
+                                            className={`h-full transition-all duration-300 ${
+                                              qOpt.accent === 'rose' ? 'bg-rose-500' :
+                                              qOpt.accent === 'indigo' ? 'bg-indigo-500' :
+                                              qOpt.accent === 'emerald' ? 'bg-emerald-500' : 'bg-sky-500'
+                                            }`}
+                                            style={{ width: `${percent}%` }}
+                                          />
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <p className="text-xs text-neutral-455 italic py-2 text-center font-bold">No objectives added to this quarter yet.</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : growthTab === 'planner' ? (
+        <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn py-2 select-none">
+          {/* Header */}
+          <div className="border-b border-border-primary pb-4 select-none flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 shrink-0">
+              <Calendar className="h-6 w-6 text-indigo-500" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black font-poppins text-text-primary uppercase tracking-wider leading-none">
+                Daily Focus Planner
+              </h1>
+              <p className="text-[10.5px] text-neutral-500 font-bold uppercase tracking-widest mt-1.5 leading-none">
+                Organize and accomplish high-impact priorities
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            {/* Left Column: Form (5 cols) */}
+            <div className="md:col-span-5 space-y-4">
+              <div className={`cred-card p-5 rounded-xl border border-border-primary space-y-4 relative ${isCalendarOpen ? 'z-30' : 'z-10'}`}>
+                <h3 className="text-[11px] font-black uppercase text-neutral-450 tracking-wider">
+                  New Task Priority
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Task Title</label>
+                    <input
+                      type="text"
+                      value={newPriorityTitle}
+                      onChange={(e) => setNewPriorityTitle(e.target.value)}
+                      placeholder="What is the task priority?..."
+                      className="cred-input h-10 px-3 rounded-xl text-xs font-bold placeholder:text-neutral-500 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1.5 pt-1">
+                    <label className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Schedule Date</label>
+                    <div className="flex items-center justify-between gap-2.5">
+                      <CustomCalendarPicker
+                        value={newPriorityDueDate}
+                        onChange={(val) => setNewPriorityDueDate(val)}
+                        isOpen={isCalendarOpen}
+                        setIsOpen={setIsCalendarOpen}
+                        calendarMonth={calendarMonth}
+                        setCalendarMonth={setCalendarMonth}
+                      />
+
+                      <button
+                        onClick={() => {
+                          if (newPriorityTitle.trim() && newPriorityDueDate) {
+                            addPlannerPriority(newPriorityTitle, newPriorityDueDate);
+                            setSelectedDate(newPriorityDueDate);
+                            setNewPriorityTitle('');
+                          }
+                        }}
+                        disabled={!newPriorityTitle.trim() || !newPriorityDueDate}
+                        className="h-10 px-4 bg-btn-primary-bg text-btn-primary-text font-extrabold text-[9px] uppercase tracking-wider rounded-xl hover:bg-btn-primary-hover transition-colors cursor-pointer disabled:opacity-30 disabled:pointer-events-none active:scale-95 shadow-sm select-none"
+                      >
+                        Schedule
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: List (7 cols) */}
+            <div className="md:col-span-7 space-y-4">
+              <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
+                <div className="flex justify-between items-center border-b border-border-primary/50 pb-2.5 select-none">
+                  <h3 className="text-xs font-black uppercase tracking-wider text-text-primary">
+                    Priorities for {selectedDate}
+                  </h3>
+                </div>
+
+                <div className="space-y-2.5 max-h-[450px] overflow-y-auto pr-1">
+                  {plannerPriorities.filter(p => p.due_date === selectedDate).length > 0 ? (
+                    plannerPriorities
+                      .filter(p => p.due_date === selectedDate)
+                      .map(p => (
+                        <div key={p.id} className="cred-card p-5 rounded-xl flex justify-between items-center gap-4 transition-all hover:border-border-hover select-none">
+                          {/* Left info area */}
+                          <div className="space-y-2 flex-1 min-w-0">
+                            {/* Category style tag */}
+                            <div className="flex items-center">
+                              <span className="flex items-center gap-1 px-2 py-0.5 rounded border border-indigo-500/20 text-indigo-500 bg-indigo-500/5 text-[9px] font-bold tracking-wider uppercase">
+                                <Target className="h-2.5 w-2.5" />
+                                <span>Priority Task</span>
+                              </span>
+                            </div>
+
+                            {/* Identity and Title */}
+                            <div>
+                              <div className="text-[10px] text-neutral-400 font-medium italic">
+                                Action item for today
+                              </div>
+                              <h3 className={`text-base font-extrabold tracking-tight mt-0.5 font-poppins truncate leading-tight ${
+                                p.is_completed
+                                  ? 'line-through text-neutral-500 opacity-60'
+                                  : p.is_skipped
+                                  ? 'line-through text-amber-550 italic opacity-60'
+                                  : 'text-text-primary'
+                              }`}>
+                                {p.title}
+                              </h3>
+                            </div>
+
+                            {/* Bottom Actions: Skip / Delete */}
+                            <div className="flex items-center gap-2 pt-1 select-none">
+                              <button
+                                onClick={() => togglePlannerPriority(p.id, { is_skipped: !p.is_skipped, is_completed: false })}
+                                className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border transition-all cursor-pointer ${
+                                  p.is_skipped
+                                    ? 'bg-amber-500/10 border-amber-500 text-amber-500'
+                                    : 'border-border-primary bg-bg-primary text-neutral-500 hover:border-amber-800 hover:text-amber-500'
+                                }`}
+                              >
+                                <Ban className="h-3 w-3" />
+                                <span>{p.is_skipped ? 'Skipped' : 'Skip'}</span>
+                              </button>
+
+                              <button
+                                onClick={() => deletePlannerPriority(p.id)}
+                                className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-border-primary bg-bg-primary text-neutral-500 hover:border-red-800 hover:text-red-500 transition-all cursor-pointer"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                                <span>Delete</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Right completion check circle or skipped display */}
+                          <div className="shrink-0 flex items-center justify-center">
+                            {p.is_skipped ? (
+                              <button
+                                onClick={() => togglePlannerPriority(p.id, { is_skipped: false })}
+                                className="h-12 min-w-[90px] px-3.5 rounded-xl border border-amber-600/40 bg-amber-500/5 text-amber-500 flex items-center justify-center gap-1.5 transition-all hover:bg-amber-500/10 cursor-pointer"
+                                title="Click to undo skip"
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Skipped</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => togglePlannerPriority(p.id, { is_completed: !p.is_completed, is_skipped: false })}
+                                className={`h-12 w-12 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+                                  p.is_completed
+                                    ? 'bg-btn-primary-bg border-btn-primary-bg text-btn-primary-text scale-105 ring-2 ring-emerald-500 ring-offset-2 ring-offset-card-bg shadow-[0_0_12px_rgba(16,185,129,0.2)]'
+                                    : 'bg-bg-primary border-border-primary text-neutral-500 hover:border-border-hover hover:text-text-primary'
+                                }`}
+                              >
+                                {p.is_completed ? (
+                                  <Check className="h-6 w-6 stroke-[3px]" />
+                                ) : (
+                                  <Circle className="h-5 w-5" />
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                  ) : (
+                    <p className="text-[10px] text-neutral-500 italic text-center py-8 select-none font-bold">
+                      No priorities scheduled for this date.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : growthTab === 'milestones' ? (
+        <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn py-2 select-none">
+          {/* Header */}
+          <div className="border-b border-border-primary pb-4 select-none flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 shrink-0">
+              <Award className="h-6 w-6 text-amber-500" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black font-poppins text-text-primary uppercase tracking-wider leading-none">
+                Milestone Markers
+              </h1>
+              <p className="text-[10.5px] text-neutral-500 font-bold uppercase tracking-widest mt-1.5 leading-none">
+                Track critical release dates and project milestones
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+            <div className="md:col-span-5">
+              <div className="cred-card p-5 rounded-xl border border-border-primary space-y-4">
+                <h3 className="text-[11px] font-black uppercase text-neutral-450 tracking-wider">
+                  New Achievement
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold text-neutral-455 uppercase tracking-wider">Milestone Title</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Launched version 1.0!..."
+                      value={newMilestoneTitle}
+                      onChange={(e) => setNewMilestoneTitle(e.target.value)}
+                      className="cred-input h-10 px-3 rounded-xl text-xs font-bold placeholder:text-neutral-500 outline-none"
+                    />
+                  </div>
+                  
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold text-neutral-455 uppercase tracking-wider">Achieved Date</label>
+                    <input
+                      type="date"
+                      value={newMilestoneDate}
+                      onChange={(e) => setNewMilestoneDate(e.target.value)}
+                      className="cred-input h-10 px-3 rounded-xl text-xs font-bold outline-none cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-bold text-neutral-455 uppercase tracking-wider">Supported Routine / Habit (Optional)</label>
+                    <select
+                      value={newMilestoneHabit}
+                      onChange={(e) => setNewMilestoneHabit(e.target.value)}
+                      className="cred-input h-10 px-3 rounded-xl text-xs font-bold outline-none cursor-pointer"
+                    >
+                      <option value="">-- No Supported Habit --</option>
+                      {processedHabits.map(h => (
+                        <option key={h.id} value={h.id}>{h.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      onClick={() => {
+                        if (newMilestoneTitle.trim() && newMilestoneDate) {
+                          addMilestone(newMilestoneTitle, newMilestoneDate, newMilestoneHabit || null);
+                          setNewMilestoneTitle('');
+                          setNewMilestoneDate('');
+                          setNewMilestoneHabit('');
+                        }
+                      }}
+                      disabled={!newMilestoneTitle.trim() || !newMilestoneDate}
+                      className="h-9 px-4 bg-amber-550 hover:bg-amber-600 text-neutral-900 font-bold text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none active:scale-95 shadow-sm"
+                    >
+                      Add Milestone
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column: List */}
+            <div className="md:col-span-7">
+              <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-wider text-text-primary border-b border-border-primary/50 pb-2">
+                  Achievement Timeline
+                </h3>
+
+                <div className="relative pl-4 space-y-6 max-h-[500px] overflow-y-auto pr-1">
+                  {milestones.length > 0 && (
+                    <div className="absolute left-[23px] top-3 bottom-3 w-[2px] bg-neutral-200 dark:bg-neutral-850" />
+                  )}
+                  {milestones
+                    .sort((a, b) => new Date(b.target_date).getTime() - new Date(a.target_date).getTime())
+                    .map(mil => {
+                      const habit = processedHabits.find(h => h.id === mil.habit_id);
+                      return (
+                        <div key={mil.id} className="relative pl-8 select-none">
+                          {/* Dot / Indicator */}
+                          <div className="absolute left-0 top-1 h-6 w-6 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-500 z-10 shadow-sm">
+                            <Award className="h-3.5 w-3.5 stroke-[2.5px]" />
+                          </div>
+
+                          {/* Milestone Card Redesign */}
+                          <div className="cred-card p-4 rounded-xl border border-border-primary flex justify-between items-start gap-4 transition-all shadow-sm hover:border-border-hover">
+                            <div className="space-y-2">
+                              <h4 className="text-xs font-black text-text-primary uppercase tracking-wide">
+                                {mil.title}
+                              </h4>
+                              
+                              <div className="flex flex-wrap items-center gap-2 text-[8px] font-black uppercase tracking-wider text-neutral-450">
+                                <span className="bg-neutral-100 dark:bg-neutral-900/60 border border-border-primary/50 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                  <Calendar className="h-3 w-3 text-indigo-500" />
+                                  <span>Achieved: {mil.target_date}</span>
+                                </span>
+
+                                {habit && (
+                                  <span className="bg-indigo-500/10 text-indigo-550 border border-indigo-500/20 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <Zap className="h-3 w-3 text-indigo-500 fill-indigo-500/10" />
+                                    <span>Habit: {habit.name}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              onClick={() => deleteMilestone(mil.id)}
+                              className="text-neutral-400 hover:text-red-500 transition-colors p-1"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  {milestones.length === 0 && (
+                    <p className="text-xs text-neutral-500 italic text-center py-8 font-bold">No milestones defined yet</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="max-w-4xl mx-auto space-y-6 animate-fadeIn py-2 select-none font-poppins">
+          {/* Header */}
+          <div className="border-b border-border-primary pb-4 select-none">
+            <h1 className="text-2xl font-black font-poppins text-text-primary uppercase tracking-wider">
+              Weekly Review
+            </h1>
+            <p className="text-[10.5px] text-neutral-500 font-bold uppercase tracking-widest mt-1">
+              Reflect on wins, friction & tweak systems
+            </p>
+          </div>
+
+          <div className="max-w-2xl mx-auto cred-card p-6 rounded-xl border border-border-primary space-y-4">
+            <div className="flex items-center gap-2.5 select-none border-b border-border-primary/50 pb-3">
+              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 shrink-0">
+                <BookOpen className="h-5 w-5 text-amber-500" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">
+                  Weekly Reflection
+                </h3>
+                <p className="text-[10px] text-neutral-500 font-semibold tracking-wide uppercase mt-0.5">
+                  Week of {activeMonday}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 pt-1">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9.5px] font-black uppercase tracking-wider text-neutral-500">Weekly Wins</label>
+                <textarea
+                  value={reviewWins}
+                  onChange={(e) => setReviewWins(e.target.value)}
+                  placeholder="What went well this week? Celebrate your achievements..."
+                  rows={3}
+                  className="cred-input p-3 rounded-xl text-xs font-bold placeholder:text-neutral-500 outline-none resize-none"
+                />
+              </div>
+              
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9.5px] font-black uppercase tracking-wider text-neutral-500">Challenges faced</label>
+                <textarea
+                  value={reviewChallenges}
+                  onChange={(e) => setReviewChallenges(e.target.value)}
+                  placeholder="What friction did you encounter? Any missed habits..."
+                  rows={3}
+                  className="cred-input p-3 rounded-xl text-xs font-bold placeholder:text-neutral-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[9.5px] font-black uppercase tracking-wider text-neutral-500">Next Week Adjustments</label>
+                <textarea
+                  value={reviewNextSteps}
+                  onChange={(e) => setReviewNextSteps(e.target.value)}
+                  placeholder="How will you tweak your environment or routines next week?"
+                  rows={3}
+                  className="cred-input p-3 rounded-xl text-xs font-bold placeholder:text-neutral-500 outline-none resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-border-primary/50">
+                <button
+                  onClick={() => saveWeeklyReview(activeMonday, reviewWins, reviewChallenges, reviewNextSteps)}
+                  className="h-10 px-6 bg-amber-500 hover:bg-amber-600 text-neutral-900 font-extrabold text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-md shadow-amber-500/10 active:scale-95"
+                >
+                  Save Reflection
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )
+      ) : dashboardTab === 'trackers' ? (
         <div className="space-y-6">
           {/* Salah Tracker Section */}
       {profile.salah_tracker_enabled && salahHabits.length > 0 && (
@@ -1444,13 +2442,43 @@ export const Dashboard: React.FC<DashboardProps> = () => {
                     <span className="text-[9px] uppercase font-extrabold text-neutral-600 dark:text-neutral-400 tracking-wider leading-none">
                       Mood for {moodActivePhase.toUpperCase().replace('_', ' ')}
                     </span>
-                    <div className="grid grid-cols-5 gap-1.5">
+                     <div className="grid grid-cols-5 gap-1.5">
                       {[
-                        { value: 'depressed', icon: CloudRain, label: 'Down', colorClass: 'text-sky-500 border-sky-500/30 hover:border-sky-500 hover:bg-sky-950/10' },
-                        { value: 'sad', icon: Frown, label: 'Sad', colorClass: 'text-indigo-400 border-indigo-500/30 hover:border-indigo-500 hover:bg-indigo-950/10' },
-                        { value: 'okay', icon: Meh, label: 'Okay', colorClass: 'text-neutral-500 border-neutral-500/30 hover:border-neutral-500 hover:bg-neutral-950/10' },
-                        { value: 'happy', icon: Smile, label: 'Happy', colorClass: 'text-amber-500 border-amber-500/30 hover:border-amber-500 hover:bg-amber-950/10' },
-                        { value: 'hyperactive', icon: Zap, label: 'Hyper', colorClass: 'text-red-500 border-red-500/30 hover:border-red-500 hover:bg-red-950/10' }
+                        { 
+                          value: 'depressed', 
+                          icon: CloudRain, 
+                          label: 'Down', 
+                          activeClass: 'bg-sky-50/80 dark:bg-sky-950/30 border-sky-400 dark:border-sky-500 text-sky-600 dark:text-sky-400 shadow-sm shadow-sky-500/5', 
+                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-sky-550 hover:border-sky-300 dark:hover:border-sky-800 hover:bg-sky-50/30 dark:hover:bg-sky-950/10' 
+                        },
+                        { 
+                          value: 'sad', 
+                          icon: Frown, 
+                          label: 'Sad', 
+                          activeClass: 'bg-indigo-50/80 dark:bg-indigo-950/30 border-indigo-400 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400 shadow-sm shadow-indigo-500/5', 
+                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-indigo-550 hover:border-indigo-300 dark:hover:border-indigo-800 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/10' 
+                        },
+                        { 
+                          value: 'okay', 
+                          icon: Meh, 
+                          label: 'Okay', 
+                          activeClass: 'bg-neutral-100 dark:bg-neutral-800/80 border-neutral-400 dark:border-neutral-600 text-neutral-600 dark:text-neutral-300 shadow-sm', 
+                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-neutral-600 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30' 
+                        },
+                        { 
+                          value: 'happy', 
+                          icon: Smile, 
+                          label: 'Happy', 
+                          activeClass: 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500 text-amber-600 dark:text-amber-400 shadow-sm shadow-amber-500/5', 
+                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-amber-550 hover:border-amber-300 dark:hover:border-amber-800 hover:bg-amber-50/30 dark:hover:bg-amber-950/10' 
+                        },
+                        { 
+                          value: 'hyperactive', 
+                          icon: Zap, 
+                          label: 'Hyper', 
+                          activeClass: 'bg-rose-50/85 dark:bg-rose-950/30 border-rose-400 dark:border-rose-500 text-rose-650 dark:text-rose-450 shadow-sm shadow-rose-500/5', 
+                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-rose-550 hover:border-rose-300 dark:hover:border-rose-800 hover:bg-rose-50/30 dark:hover:bg-rose-950/10' 
+                        }
                       ].map(m => {
                         const MoodIcon = m.icon;
                         const isActive = selectedMood === m.value;
@@ -1458,10 +2486,10 @@ export const Dashboard: React.FC<DashboardProps> = () => {
                           <button
                             key={m.value}
                             onClick={() => setSelectedMood(m.value as any)}
-                            className={`h-11 border rounded-xl flex flex-col items-center justify-center transition-all cursor-pointer ${
+                            className={`h-11 border rounded-xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
                               isActive
-                                ? `${m.colorClass.split(' ')[0]} bg-neutral-900 border-current scale-105 font-bold shadow-lg shadow-black/10`
-                                : 'border-border-primary text-neutral-500 hover:text-neutral-400'
+                                ? `${m.activeClass} scale-105 font-bold`
+                                : m.inactiveClass
                             }`}
                           >
                             <MoodIcon className="h-4.5 w-4.5" />
@@ -1479,19 +2507,34 @@ export const Dashboard: React.FC<DashboardProps> = () => {
                     </span>
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { value: 'low', label: 'Low', colorClass: 'text-red-500 border-red-500/30 hover:border-red-500 hover:bg-red-950/10' },
-                        { value: 'medium', label: 'Medium', colorClass: 'text-yellow-500 border-yellow-500/30 hover:border-yellow-500 hover:bg-yellow-950/10' },
-                        { value: 'high', label: 'High', colorClass: 'text-green-500 border-green-500/30 hover:border-green-500 hover:bg-green-950/10' }
+                        { 
+                          value: 'low', 
+                          label: 'Low', 
+                          activeClass: 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm', 
+                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-blue-500 hover:border-blue-300 dark:hover:border-blue-800 hover:bg-blue-50/30 dark:hover:bg-blue-950/10' 
+                        },
+                        { 
+                          value: 'medium', 
+                          label: 'Medium', 
+                          activeClass: 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500 text-amber-600 dark:text-amber-450 shadow-sm', 
+                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-amber-500 hover:border-amber-300 dark:hover:border-amber-800 hover:bg-amber-50/30 dark:hover:bg-amber-950/10' 
+                        },
+                        { 
+                          value: 'high', 
+                          label: 'High', 
+                          activeClass: 'bg-emerald-50/85 dark:bg-emerald-950/30 border-emerald-400 dark:border-emerald-500 text-emerald-650 dark:text-emerald-400 shadow-sm', 
+                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-emerald-550 hover:border-emerald-300 dark:hover:border-emerald-800 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10' 
+                        }
                       ].map(e => {
                         const isActive = selectedEnergy === e.value;
                         return (
                           <button
                             key={e.value}
                             onClick={() => setSelectedEnergy(e.value as any)}
-                            className={`h-10 border rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                            className={`h-10 border rounded-xl flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
                               isActive
-                                ? `${e.colorClass.split(' ')[0]} bg-neutral-900 border-current scale-105 font-bold shadow-lg shadow-black/10`
-                                : 'border-border-primary text-neutral-500 hover:text-neutral-400'
+                                ? `${e.activeClass} scale-105 font-bold`
+                                : e.inactiveClass
                             }`}
                           >
                             <Battery className="h-4.5 w-4.5" />
@@ -1592,7 +2635,7 @@ export const Dashboard: React.FC<DashboardProps> = () => {
             <button
               onClick={() => logMood(selectedMood as any, selectedEnergy as any, moodActivePhase, selectedDate)}
               disabled={!selectedMood || !selectedEnergy}
-              className="h-9 px-4 bg-amber-500 hover:bg-amber-600 text-neutral-900 font-bold text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
+              className="h-9 px-4 bg-amber-500 hover:bg-amber-600 text-white font-black text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
             >
               Save wellbeing Log
             </button>
@@ -1837,471 +2880,6 @@ export const Dashboard: React.FC<DashboardProps> = () => {
         </div>
       </div>
       </div>
-      ) : dashboardTab === 'planner' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left Column: Plan Tomorrow & Weekly Review */}
-          <div className="space-y-6">
-            
-            {/* Daily Priorities Planner */}
-            <div className={`cred-glass p-6 rounded-2xl border border-border-primary space-y-4 relative ${isCalendarOpen ? 'z-30' : 'z-10'}`}>
-              <div className="flex items-center justify-between gap-2 select-none">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-indigo-500 shrink-0">
-                    <Calendar className="h-5 w-5 text-indigo-500" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold font-poppins text-text-primary uppercase tracking-wider">
-                      Daily Focus Planner
-                    </h3>
-                    <p className="text-[10px] text-neutral-500 font-semibold tracking-wide uppercase mt-0.5">
-                      Set and check off priorities for any date
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Add Priority Form */}
-              <div className="space-y-3 p-3 bg-neutral-50 dark:bg-neutral-900/30 border border-border-primary/50 rounded-2xl">
-                <span className="text-[9px] font-black uppercase text-neutral-500 tracking-wider block select-none">
-                  Add Strategic Priority
-                </span>
-                
-                <div className="flex flex-col gap-2">
-                  <input
-                    type="text"
-                    value={newPriorityTitle}
-                    onChange={(e) => setNewPriorityTitle(e.target.value)}
-                    placeholder="What is the task priority?..."
-                    className="h-10 px-3 bg-white dark:bg-neutral-955 border border-border-primary rounded-xl text-xs text-text-primary font-bold placeholder:text-neutral-500 focus:border-indigo-500 outline-none"
-                  />
-                  
-                  <div className="flex items-center justify-between gap-2.5">
-                    {/* Custom Calendar Picker */}
-                    <CustomCalendarPicker
-                      value={newPriorityDueDate}
-                      onChange={(val) => setNewPriorityDueDate(val)}
-                      isOpen={isCalendarOpen}
-                      setIsOpen={setIsCalendarOpen}
-                      calendarMonth={calendarMonth}
-                      setCalendarMonth={setCalendarMonth}
-                    />
-
-                    <button
-                      onClick={() => {
-                        if (newPriorityTitle.trim() && newPriorityDueDate) {
-                          addPlannerPriority(newPriorityTitle, newPriorityDueDate);
-                          setNewPriorityTitle('');
-                        }
-                      }}
-                      disabled={!newPriorityTitle.trim() || !newPriorityDueDate}
-                      className="h-10 px-4 bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
-                    >
-                      Schedule Task
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Priorities List for Current Selected Date */}
-              <div className="space-y-2">
-                <span className="text-[9px] font-black uppercase text-neutral-500 tracking-wider block select-none">
-                  Priorities for {selectedDate}
-                </span>
-
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                  {plannerPriorities.filter(p => p.due_date === selectedDate).length > 0 ? (
-                    plannerPriorities
-                      .filter(p => p.due_date === selectedDate)
-                      .map(p => (
-                        <div key={p.id} className="p-3 bg-neutral-50 dark:bg-neutral-900/40 border border-border-primary rounded-xl flex justify-between items-center gap-3 select-none">
-                          <div className="flex items-center gap-3">
-                            {/* Complete checkbox */}
-                            <button
-                              onClick={() => togglePlannerPriority(p.id, { is_completed: !p.is_completed, is_skipped: false })}
-                              className={`h-5 w-5 rounded-lg flex items-center justify-center border transition-all cursor-pointer shrink-0 ${
-                                p.is_completed
-                                  ? 'bg-indigo-500 border-indigo-500 text-white'
-                                  : 'border-border-primary text-neutral-450 hover:border-neutral-500'
-                              }`}
-                            >
-                              {p.is_completed && <Check className="h-3 w-3 stroke-[3px]" />}
-                            </button>
-
-                            <div>
-                              <p className={`text-xs font-bold leading-tight ${
-                                p.is_completed
-                                  ? 'line-through text-neutral-500 opacity-60'
-                                  : p.is_skipped
-                                  ? 'line-through text-amber-500/70 italic font-medium'
-                                  : 'text-text-primary'
-                              }`}>
-                                {p.title}
-                              </p>
-                              {p.is_skipped && (
-                                <span className="text-[7px] font-black uppercase text-amber-500 tracking-wider mt-0.5 block">
-                                  Skipped / Excused
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1 shrink-0">
-                            {/* Skip button */}
-                            <button
-                              onClick={() => togglePlannerPriority(p.id, { is_skipped: !p.is_skipped, is_completed: false })}
-                              className={`px-2.5 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-wider transition-all cursor-pointer border ${
-                                p.is_skipped
-                                  ? 'bg-amber-500/10 border-amber-500 text-amber-500 shadow-sm'
-                                  : 'border-border-primary text-neutral-500 hover:border-neutral-400'
-                              }`}
-                            >
-                              Skip
-                            </button>
-                            {/* Delete button */}
-                            <button
-                              onClick={() => deletePlannerPriority(p.id)}
-                              className="text-neutral-450 hover:text-red-500 transition-colors p-1.5"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                  ) : (
-                    <p className="text-[10px] text-neutral-400 italic text-center py-4 select-none">
-                      No priorities scheduled for this date.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Weekly Review Panel */}
-            <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
-              <div className="flex justify-between items-start gap-2 select-none">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-amber-500 shrink-0">
-                    <BookOpen className="h-5 w-5 text-amber-500" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold font-poppins text-text-primary uppercase tracking-wider">
-                      Weekly Reflection
-                    </h3>
-                    <p className="text-[10px] text-neutral-500 font-semibold tracking-wide uppercase mt-0.5">
-                      Week of {activeMonday}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-500 tracking-wider">Weekly Wins</label>
-                  <textarea
-                    value={reviewWins}
-                    onChange={(e) => setReviewWins(e.target.value)}
-                    placeholder="What went well this week? Celebrate your achievements..."
-                    rows={2}
-                    className="p-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-xs text-text-primary font-bold placeholder:text-neutral-500 focus:border-indigo-500 outline-none resize-none"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-500 tracking-wider">Challenges faced</label>
-                  <textarea
-                    value={reviewChallenges}
-                    onChange={(e) => setReviewChallenges(e.target.value)}
-                    placeholder="What friction did you encounter? Any missed habits..."
-                    rows={2}
-                    className="p-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-xs text-text-primary font-bold placeholder:text-neutral-500 focus:border-indigo-500 outline-none resize-none"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-[9px] font-black uppercase text-neutral-500 tracking-wider">Next Week Adjustments</label>
-                  <textarea
-                    value={reviewNextSteps}
-                    onChange={(e) => setReviewNextSteps(e.target.value)}
-                    placeholder="How will you tweak your environment or routines next week?"
-                    rows={2}
-                    className="p-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-xs text-text-primary font-bold placeholder:text-neutral-500 focus:border-indigo-500 outline-none resize-none"
-                  />
-                </div>
-
-                <div className="flex justify-end pt-2 border-t border-border-primary/50">
-                  <button
-                    onClick={() => saveWeeklyReview(activeMonday, reviewWins, reviewChallenges, reviewNextSteps)}
-                    className="h-9 px-4 bg-amber-500 hover:bg-amber-600 text-neutral-900 font-bold text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                  >
-                    Save Reflection
-                  </button>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-          {/* Right Column: Roadmap & Milestones */}
-          <div className="space-y-6">
-            
-            {/* Yearly & Quarterly Roadmap */}
-            <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
-              <div className="flex items-center justify-between gap-2 select-none">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-teal-500 shrink-0">
-                    <Target className="h-5 w-5 text-teal-500" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold font-poppins text-text-primary uppercase tracking-wider">
-                      Strategic Roadmap
-                    </h3>
-                    <p className="text-[10px] text-neutral-500 font-semibold tracking-wide uppercase mt-0.5">
-                      Align yearly plans to quarterly actions
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Add Yearly Plan Form */}
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="New Yearly Vision Plan (e.g. Read 24 books)..."
-                  value={newYearlyTitle}
-                  onChange={(e) => setNewYearlyTitle(e.target.value)}
-                  className="flex-1 h-9 px-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-xs text-text-primary font-bold placeholder:text-neutral-500 focus:border-teal-500 outline-none"
-                />
-                <button
-                  onClick={() => {
-                    if (newYearlyTitle.trim()) {
-                      addYearlyPlan(newYearlyTitle);
-                      setNewYearlyTitle('');
-                    }
-                  }}
-                  className="h-9 px-4 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer"
-                >
-                  Add Plan
-                </button>
-              </div>
-
-              {/* Plans List */}
-              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-1">
-                {yearlyPlans.map(plan => {
-                  const planGoals = quarterlyGoals.filter(g => g.yearly_plan_id === plan.id);
-                  return (
-                    <div key={plan.id} className="p-4 bg-neutral-50 dark:bg-neutral-900/40 border border-border-primary rounded-2xl space-y-3">
-                      <div className="flex justify-between items-center select-none">
-                        <span className="text-xs font-black text-text-primary uppercase tracking-wide">
-                          {plan.title}
-                        </span>
-                        <button
-                          onClick={() => deleteYearlyPlan(plan.id)}
-                          className="text-neutral-500 hover:text-red-500 transition-colors p-1"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-
-                      {/* Quarters Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {['Q1', 'Q2', 'Q3', 'Q4'].map(q => {
-                          const goal = planGoals.find(g => g.quarter === q);
-                          return (
-                            <div key={q} className="p-2.5 bg-white dark:bg-neutral-950 border border-border-primary/50 rounded-xl flex items-center justify-between gap-2">
-                              <div>
-                                <span className="text-[8px] font-black uppercase text-neutral-400 dark:text-neutral-500 tracking-wider">
-                                  {q} Goal
-                                </span>
-                                {goal ? (
-                                  <p className={`text-[10px] font-bold text-text-primary leading-tight mt-0.5 ${goal.is_completed ? 'line-through opacity-50' : ''}`}>
-                                    {goal.title}
-                                  </p>
-                                ) : (
-                                  <p className="text-[10px] italic text-neutral-500 mt-0.5">
-                                    No goal set
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0 select-none">
-                                {goal ? (
-                                  <>
-                                    <button
-                                      onClick={() => toggleQuarterlyGoal(goal.id, !goal.is_completed)}
-                                      className={`h-5 w-5 rounded-lg flex items-center justify-center border transition-all cursor-pointer ${
-                                        goal.is_completed
-                                          ? 'bg-teal-500/20 border-teal-500 text-teal-500'
-                                          : 'border-border-primary text-neutral-400 hover:border-neutral-500'
-                                      }`}
-                                    >
-                                      {goal.is_completed && <Check className="h-3 w-3 stroke-[3px]" />}
-                                    </button>
-                                    <button
-                                      onClick={() => deleteQuarterlyGoal(goal.id)}
-                                      className="text-neutral-400 hover:text-red-500 transition-colors p-1"
-                                    >
-                                      <Trash2 className="h-3.5 w-3.5" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  /* Inline setting form */
-                                  <div className="flex flex-col items-end gap-1">
-                                    <button
-                                      onClick={() => {
-                                        const titleVal = newQuarterlyTitle[plan.id] || '';
-                                        if (titleVal.trim()) {
-                                          addQuarterlyGoal(plan.id, q as any, titleVal);
-                                          setNewQuarterlyTitle(prev => ({ ...prev, [plan.id]: '' }));
-                                        }
-                                      }}
-                                      className="text-[9px] font-black uppercase tracking-wider text-teal-500 hover:text-teal-400 cursor-pointer"
-                                    >
-                                      + Add
-                                    </button>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Goal Inline Creator Input Field (if any quarter is unset) */}
-                      {planGoals.length < 4 && (
-                        <div className="pt-2 border-t border-border-primary/50 flex gap-2">
-                          <select
-                            value={newQuarterlyQuarter[plan.id] || 'Q1'}
-                            onChange={(e) => setNewQuarterlyQuarter(prev => ({ ...prev, [plan.id]: e.target.value as any }))}
-                            className="h-8 px-2 bg-white dark:bg-neutral-950 border border-border-primary rounded-xl text-[10px] text-text-primary font-bold outline-none cursor-pointer"
-                          >
-                            {['Q1', 'Q2', 'Q3', 'Q4']
-                              .filter(quarterOption => !planGoals.some(g => g.quarter === quarterOption))
-                              .map(quarterOption => (
-                                <option key={quarterOption} value={quarterOption}>{quarterOption}</option>
-                              ))}
-                          </select>
-                          <input
-                            type="text"
-                            placeholder="Set new Quarterly goal..."
-                            value={newQuarterlyTitle[plan.id] || ''}
-                            onChange={(e) => setNewQuarterlyTitle(prev => ({ ...prev, [plan.id]: e.target.value }))}
-                            className="flex-1 h-8 px-2.5 bg-white dark:bg-neutral-950 border border-border-primary rounded-xl text-[10px] text-text-primary font-bold outline-none"
-                          />
-                          <button
-                            onClick={() => {
-                              const q = newQuarterlyQuarter[plan.id] || ['Q1', 'Q2', 'Q3', 'Q4'].find(qo => !planGoals.some(g => g.quarter === qo)) || 'Q1';
-                              const title = newQuarterlyTitle[plan.id] || '';
-                              if (title.trim()) {
-                                addQuarterlyGoal(plan.id, q as any, title);
-                                setNewQuarterlyTitle(prev => ({ ...prev, [plan.id]: '' }));
-                              }
-                            }}
-                            className="h-8 px-3 bg-neutral-200 dark:bg-neutral-900 hover:bg-neutral-300 dark:hover:bg-neutral-850 text-text-primary font-extrabold text-[10px] rounded-xl transition-all cursor-pointer"
-                          >
-                            Save Goal
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {yearlyPlans.length === 0 && (
-                  <p className="text-xs text-neutral-500 italic text-center py-4">No yearly plans defined yet</p>
-                )}
-              </div>
-            </div>
-
-            {/* Milestone Markers */}
-            <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
-              <div className="flex items-center gap-2.5 select-none">
-                <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-amber-500 shrink-0">
-                  <Award className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-extrabold font-poppins text-text-primary uppercase tracking-wider">
-                    Milestone Markers
-                  </h3>
-                  <p className="text-[10px] text-neutral-500 font-semibold tracking-wide uppercase mt-0.5">
-                    Track critical dates and target milestones
-                  </p>
-                </div>
-              </div>
-
-              {/* Add Milestone Form */}
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    placeholder="Milestone title (e.g. Launch Beta)..."
-                    value={newMilestoneTitle}
-                    onChange={(e) => setNewMilestoneTitle(e.target.value)}
-                    className="flex-1 h-9 px-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-xs text-text-primary font-bold placeholder:text-neutral-500 focus:border-amber-500 outline-none"
-                  />
-                  <input
-                    type="date"
-                    value={newMilestoneDate}
-                    onChange={(e) => setNewMilestoneDate(e.target.value)}
-                    className="h-9 px-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-xs text-text-primary font-bold focus:border-amber-500 outline-none cursor-pointer"
-                  />
-                </div>
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => {
-                      if (newMilestoneTitle.trim() && newMilestoneDate) {
-                        addMilestone(newMilestoneTitle, newMilestoneDate);
-                        setNewMilestoneTitle('');
-                        setNewMilestoneDate('');
-                      }
-                    }}
-                    disabled={!newMilestoneTitle.trim() || !newMilestoneDate}
-                    className="h-8 px-4 bg-amber-500 hover:bg-amber-600 text-neutral-900 font-bold text-[9px] uppercase tracking-wider rounded-xl transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none"
-                  >
-                    Add Milestone
-                  </button>
-                </div>
-              </div>
-
-              {/* Milestones List */}
-              <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                {milestones
-                  .sort((a, b) => new Date(a.target_date).getTime() - new Date(b.target_date).getTime())
-                  .map(mil => (
-                    <div key={mil.id} className="p-3 bg-neutral-50 dark:bg-neutral-900/40 border border-border-primary rounded-xl flex justify-between items-center gap-3">
-                      <div className="flex items-center gap-3">
-                        <button
-                          onClick={() => toggleMilestone(mil.id, !mil.is_completed)}
-                          className={`h-5 w-5 rounded-lg flex items-center justify-center border transition-all cursor-pointer shrink-0 ${
-                            mil.is_completed
-                              ? 'bg-amber-500/20 border-amber-500 text-amber-500'
-                              : 'border-border-primary text-neutral-400 hover:border-neutral-500'
-                          }`}
-                        >
-                          {mil.is_completed && <Check className="h-3 w-3 stroke-[3px]" />}
-                        </button>
-                        <div>
-                          <p className={`text-xs font-bold leading-tight ${mil.is_completed ? 'line-through opacity-50' : 'text-text-primary'}`}>
-                            {mil.title}
-                          </p>
-                          <span className="text-[8px] font-black uppercase text-neutral-400 dark:text-neutral-500 tracking-wider">
-                            Due: {mil.target_date}
-                          </span>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => deleteMilestone(mil.id)}
-                        className="text-neutral-500 hover:text-red-500 transition-colors p-1"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                {milestones.length === 0 && (
-                  <p className="text-xs text-neutral-500 italic text-center py-4">No milestones defined yet</p>
-                )}
-              </div>
-            </div>
-
-          </div>
-        </div>
       ) : (
       <>
         {/* Checklist Organizer Toolbar */}

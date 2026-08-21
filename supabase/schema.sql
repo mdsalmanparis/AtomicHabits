@@ -265,6 +265,7 @@ create table if not exists habitpro.quarterly_goals (
   due_date date,
   current_progress integer not null default 0,
   total_target integer,
+  status text not null default 'planned' check (status in ('planned', 'in-progress', 'completed', 'failed')),
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
@@ -280,6 +281,7 @@ create table if not exists habitpro.milestones (
   title text not null,
   target_date date not null,
   is_completed boolean not null default false,
+  habit_id uuid references habitpro.habits(id) on delete set null,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
