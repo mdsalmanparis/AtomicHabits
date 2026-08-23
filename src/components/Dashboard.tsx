@@ -20,7 +20,6 @@ import {
   Flame,
   Droplet,
   ChevronDown,
-  ChevronRight,
   Bed,
   Smile,
   CloudRain,
@@ -38,11 +37,15 @@ import {
   Check,
   Edit2,
   Ban,
-  Circle
+  Circle,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 
 interface DashboardProps {
-  activeTab?: 'habits' | 'growth';
+  activeTab: 'habits' | 'growth';
+  showHabitForm?: boolean;
+  setShowHabitForm?: (show: boolean) => void;
 }
 
 const LIFE_PHASES_META = [
@@ -52,6 +55,14 @@ const LIFE_PHASES_META = [
   { id: 'phase_3', name: 'Phase 3 (8 PM - 12 AM)', desc: 'Night Shift Core', icon: Brain },
   { id: 'phase_4', name: 'Phase 4 (12 AM - 4 AM)', desc: 'Late Night Burn', icon: Briefcase }
 ];
+
+const PHASE_ROMAN_NAMES: Record<string, string> = {
+  all_day: 'All Day',
+  phase_1: 'Phase I',
+  phase_2: 'Phase II',
+  phase_3: 'Phase III',
+  phase_4: 'Phase IV'
+};
 
 interface CustomDropdownProps {
   label: string;
@@ -73,7 +84,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({ label, value, options, 
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="h-9 px-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-[10px] text-text-primary font-bold flex items-center justify-between gap-2 focus:border-indigo-500 cursor-pointer min-w-[140px] hover:border-neutral-400 transition-colors"
+        className="h-9 px-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-[10px] text-text-primary font-bold flex items-center justify-between gap-2 focus:border-indigo-500 cursor-pointer min-w-[130px] sm:min-w-[140px] shrink-0 hover:border-neutral-400 transition-colors"
       >
         <span className="flex items-center gap-1.5">
           {icon}
@@ -238,7 +249,7 @@ const CustomCalendarPicker: React.FC<CustomCalendarPickerProps> = ({
   );
 };
 
-export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', showHabitForm: propsShowHabitForm, setShowHabitForm: propsSetShowHabitForm }) => {
   const profile = useStore(state => state.profile);
   const habits = useStore(state => state.habits);
   const logs = useStore(state => state.logs);
@@ -276,24 +287,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
   const togglePlannerPriority = useStore(state => state.togglePlannerPriority);
   const deletePlannerPriority = useStore(state => state.deletePlannerPriority);
   
-  const [showHabitForm, setShowHabitForm] = useState(false);
+  const [internalShowHabitForm, setInternalShowHabitForm] = useState(false);
+  const showHabitForm = propsShowHabitForm !== undefined ? propsShowHabitForm : internalShowHabitForm;
+  const setShowHabitForm = propsSetShowHabitForm !== undefined ? propsSetShowHabitForm : setInternalShowHabitForm;
   const [editHabitId, setEditHabitId] = useState<string | undefined>(undefined);
   const [sleepStart, setSleepStart] = useState('');
   const [sleepEnd, setSleepEnd] = useState('');
   const [selectedMood, setSelectedMood] = useState<'hyperactive' | 'happy' | 'okay' | 'sad' | 'depressed' | ''>('');
   const [selectedEnergy, setSelectedEnergy] = useState<'high' | 'medium' | 'low' | ''>('');
   
-  const [sleepViewMode, setSleepViewMode] = useState<'input' | 'chart'>('input');
-  const [moodViewMode, setMoodViewMode] = useState<'input' | 'chart'>('input');
   const [moodActivePhase, setMoodActivePhase] = useState<'phase_1' | 'phase_2' | 'phase_3' | 'phase_4'>('phase_1');
+  const [selectedPhaseId, setSelectedPhaseId] = useState<string>('all_day');
   const [groupBy, setGroupBy] = useState<'phase' | 'category' | 'flat'>('phase');
   const [sortBy, setSortBy] = useState<'default' | 'uncompleted' | 'failing' | 'alpha'>('default');
-  const [filterBy, setFilterBy] = useState<'all' | 'uncompleted' | 'completed' | 'salah' | 'habits'>('all');
+  const [filterBy, setFilterBy] = useState<'all' | 'uncompleted' | 'completed'>('all');
   const [dashboardTab, setDashboardTab] = useState<'checklist' | 'trackers'>('checklist');
   const [growthTab, setGrowthTab] = useState<'planner' | 'milestones' | 'review' | 'roadmap'>('planner');
   const [meditationDuration, setMeditationDuration] = useState(0);
   const [meditationTarget, setMeditationTarget] = useState(15);
-  const [meditationViewMode, setMeditationViewMode] = useState<'input' | 'chart'>('input');
 
   const [editingGoalTarget, setEditingGoalTarget] = useState<Record<string, string>>({});
   const [editingGoalTargetId, setEditingGoalTargetId] = useState<string | null>(null);
@@ -321,20 +332,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
 
   const categories = useStore(state => state.categories) || [];
-  const [collapsedPhases, setCollapsedPhases] = useState<Record<string, boolean>>({
-    all_day: false,
-    phase_1: false,
-    phase_2: false,
-    phase_3: false,
-    phase_4: false
-  });
 
-  const togglePhaseCollapse = (phaseId: string) => {
-    setCollapsedPhases(prev => ({
-      ...prev,
-      [phaseId]: !prev[phaseId]
-    }));
-  };
 
   const todayLogicalStr = getLogicalDate(new Date(), profile.day_offset_hours);
   const [selectedDate, setSelectedDate] = useState(todayLogicalStr);
@@ -408,80 +406,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
 
 
 
-  // Helper to generate last 7 days of dates up to selectedDate
-  const getLast7Days = (endDateStr: string) => {
-    const dates = [];
-    const endDate = new Date(endDateStr + 'T00:00:00');
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date(endDate);
-      d.setDate(endDate.getDate() - i);
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      dates.push(`${year}-${month}-${day}`);
-    }
-    return dates;
-  };
 
-  const getLinePath = (points: {x: number, y: number}[]) => {
-    if (points.length === 0) return '';
-    return points.reduce((acc, p, idx) => {
-      return idx === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`;
-    }, '');
-  };
-
-  const getAreaPath = (points: {x: number, y: number}[], bottomY: number) => {
-    if (points.length === 0) return '';
-    const linePath = getLinePath(points);
-    return `${linePath} L ${points[points.length - 1].x} ${bottomY} L ${points[0].x} ${bottomY} Z`;
-  };
-
-  const last7Days = getLast7Days(selectedDate);
-
-  // Sleep Chart data points
-  const sleepChartData = last7Days.map(dateStr => {
-    const log = sleepLogs.find(s => s.logical_date === dateStr);
-    return {
-      date: dateStr,
-      label: dateStr.split('-').slice(1).join('/'),
-      hours: log ? Number(log.duration_hours) : 0
-    };
-  });
-
-  // Mood/Energy Chart data points
-  const moodScoreMap: Record<string, number> = { depressed: 1, sad: 2, okay: 3, happy: 4, hyperactive: 5 };
-  const energyScoreMap: Record<string, number> = { low: 1, medium: 2, high: 3 };
-
-  const moodChartData = last7Days.map(dateStr => {
-    const dayLogs = moodLogs.filter(m => m.logical_date === dateStr);
-    if (dayLogs.length === 0) {
-      return {
-        date: dateStr,
-        label: dateStr.split('-').slice(1).join('/'),
-        mood: 0,
-        energy: 0
-      };
-    }
-    const moodSum = dayLogs.reduce((sum, log) => sum + (moodScoreMap[log.mood] || 0), 0);
-    const energySum = dayLogs.reduce((sum, log) => sum + (energyScoreMap[log.energy] || 0), 0);
-    return {
-      date: dateStr,
-      label: dateStr.split('-').slice(1).join('/'),
-      mood: Number((moodSum / dayLogs.length).toFixed(2)),
-      energy: Number((energySum / dayLogs.length).toFixed(2))
-    };
-  });
-
-  // Meditation Chart data points
-  const meditationChartData = last7Days.map(dateStr => {
-    const log = meditationLogs.find(m => m.logical_date === dateStr);
-    return {
-      date: dateStr,
-      label: dateStr.split('-').slice(1).join('/'),
-      duration: log ? Number(log.duration_minutes) : 0,
-      target: log ? Number(log.target_minutes) : 15
-    };
-  });
 
   const getHabitFailureRate = (habitId: string) => {
     const h = habits.find(hab => hab.id === habitId);
@@ -527,6 +452,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
 
   const getHabitListMetrics = (habitsList: typeof habits) => {
     let completed = 0;
+    let skipped = 0;
     let frozen = 0;
     let justified = 0;
     let pending = 0;
@@ -539,7 +465,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
         frozen++;
       } else if (log) {
         if (log.is_skipped) {
-          completed++;
+          skipped++;
         } else if (log.is_justified) {
           justified++;
         } else if (log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
@@ -552,11 +478,24 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
       }
     });
 
-    return { completed, frozen, justified, pending };
+    return { completed, skipped, frozen, justified, pending };
   };
 
   const activeHabits = habits.filter(h => !h.is_archived);
-  const scheduledActiveHabits = activeHabits.filter(h => isHabitScheduledForDate(h, selectedDate));
+
+  // Helper to filter scheduled habits for a given date including Friday/non-Friday Salah rules
+  const getFilteredScheduledHabitsForDate = (dateStr: string) => {
+    const isFriday = new Date(dateStr + 'T00:00:00').getDay() === 5;
+    const excludePrayer = isFriday ? 'Dhuhr' : 'Jummah';
+    
+    return activeHabits.filter(h => {
+      if (!isHabitScheduledForDate(h, dateStr)) return false;
+      if (h.is_salah && h.name === excludePrayer) return false;
+      return true;
+    });
+  };
+
+  const scheduledActiveHabits = getFilteredScheduledHabitsForDate(selectedDate);
 
   // If Salah Tracker is enabled, filter Salah and Water habits out of the standard cue phase lists
   const normalActiveHabits = profile.salah_tracker_enabled
@@ -578,10 +517,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
       const completed = log && (log.is_skipped || log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version));
       return completed;
     });
-  } else if (filterBy === 'salah') {
-    processedHabits = processedHabits.filter(h => h.is_salah);
-  } else if (filterBy === 'habits') {
-    processedHabits = processedHabits.filter(h => !h.is_salah);
   }
 
   // Sort pipeline
@@ -629,13 +564,92 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
   let completedCount = 0;
   scheduledActiveHabits.forEach(h => {
     const log = logs.find(l => l.habit_id === h.id && l.logical_date === selectedDate);
-    if (log) {
-      if (log.is_skipped || log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
+    const isFrozen = freezes.some(f => f.logical_date === selectedDate && f.habit_id === h.id);
+    if (isFrozen) {
+      completedCount++;
+    } else if (log) {
+      if (log.is_skipped || log.is_justified || log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
         completedCount++;
       }
     }
   });
-  const percentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  let welcomeCompleted = 0;
+  let welcomeSkipped = 0;
+  let welcomeFrozen = 0;
+  let welcomeJustified = 0;
+  let welcomePending = 0;
+
+  scheduledActiveHabits.forEach(h => {
+    const log = logs.find(l => l.habit_id === h.id && l.logical_date === selectedDate);
+    const isFrozen = freezes.some(f => f.logical_date === selectedDate && f.habit_id === h.id);
+    
+    if (isFrozen) {
+      welcomeFrozen++;
+    } else if (log) {
+      if (log.is_skipped) {
+        welcomeSkipped++;
+      } else if (log.is_justified) {
+        welcomeJustified++;
+      } else if (log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
+        welcomeCompleted++;
+      } else {
+        welcomePending++;
+      }
+    } else {
+      welcomePending++;
+    }
+  });
+
+  const welcomeDoneTotal = welcomeCompleted + welcomeSkipped + welcomeFrozen + welcomeJustified;
+
+
+  // Helper to calculate weekly trend (last 7 days vs previous 7 days)
+  const getWeeklyTrend = () => {
+    const current7Days = Array.from({ length: 7 }, (_, i) => addDays(todayLogicalStr, -i));
+    const previous7Days = Array.from({ length: 7 }, (_, i) => addDays(todayLogicalStr, -i - 7));
+    
+    const getAvgCompletion = (days: string[]) => {
+      let totalPercentage = 0;
+      let trackedDays = 0;
+      
+      days.forEach(dStr => {
+        const dayHabits = getFilteredScheduledHabitsForDate(dStr);
+        const dayTotal = dayHabits.length;
+        if (dayTotal > 0) {
+          let dayCompleted = 0;
+          dayHabits.forEach(h => {
+            const log = logs.find(l => l.habit_id === h.id && l.logical_date === dStr);
+            const isFrozen = freezes.some(f => f.logical_date === dStr && f.habit_id === h.id);
+            if (isFrozen) {
+              dayCompleted++;
+            } else if (log) {
+              if (log.is_skipped || log.is_justified || log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
+                dayCompleted++;
+              }
+            }
+          });
+          totalPercentage += (dayCompleted / dayTotal) * 100;
+          trackedDays++;
+        }
+      });
+      
+      return trackedDays > 0 ? totalPercentage / trackedDays : 0;
+    };
+    
+    const avgCurrent = getAvgCompletion(current7Days);
+    const avgPrevious = getAvgCompletion(previous7Days);
+    const diff = Math.round(avgCurrent - avgPrevious);
+    
+    return {
+      avgCurrent: Math.round(avgCurrent),
+      avgPrevious: Math.round(avgPrevious),
+      diff,
+      status: diff > 0 ? 'improving' : diff < 0 ? 'low' : 'maintaining'
+    };
+  };
+
+  const trend = getWeeklyTrend();
 
   // Salah Tracker specific state and calculations
   const allActiveSalahHabits = habits.filter(h => h.is_salah && !h.is_archived);
@@ -779,79 +793,80 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
       {activeTab === 'habits' && (
         <>
           {/* Top Header Card */}
-          <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          {/* Identity Title & Progress Ring */}
-          <div className="flex items-center gap-4">
+          <div className="cred-glass p-5 sm:p-6 rounded-2xl border border-border-primary space-y-3.5">
+            {/* Header row: Left: welcome details, Right: Shields */}
+            <div className="flex justify-between items-start w-full gap-4">
+              <div className="space-y-1">
+                <h1 className="text-xl sm:text-2xl font-black font-poppins text-text-primary tracking-tight">
+                  Hola, {profile.display_name}
+                </h1>
+                <p className="text-[10px] sm:text-xs text-neutral-500 font-semibold select-none flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span>{formatFriendlyDate(selectedDate)} (Ends at 5AM)</span>
+                  <span className="text-neutral-300 dark:text-neutral-800 select-none">•</span>
+                  <span className={`inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wider ${
+                    trend.status === 'improving'
+                      ? 'text-emerald-500'
+                      : trend.status === 'low'
+                      ? 'text-rose-500'
+                      : 'text-neutral-445 dark:text-neutral-500'
+                  }`}>
+                    {trend.status === 'improving' ? (
+                      <TrendingUp className="h-3 w-3 stroke-[3px]" />
+                    ) : trend.status === 'low' ? (
+                      <TrendingDown className="h-3 w-3 stroke-[3px]" />
+                    ) : (
+                      <span className="font-extrabold text-[12px] leading-none select-none">→</span>
+                    )}
+                    <span>
+                      {trend.status === 'improving' ? 'Improving' : trend.status === 'low' ? 'Going Low' : 'Maintaining Same'} ({trend.diff > 0 ? `+${trend.diff}%` : `${trend.diff}%`} vs last week)
+                    </span>
+                  </span>
+                </p>
+              </div>
+
+              {/* Streak Shields Pill */}
+              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-[9px] font-black text-cyan-400 uppercase tracking-wider shrink-0 select-none">
+                <Shield className="h-3.5 w-3.5 fill-cyan-400/20" />
+                <span>Shields: {profile.streak_shields}</span>
+              </div>
+            </div>
+
+            {/* Daily Status Capsules */}
             {totalCount > 0 && (
-              <div className="relative flex items-center justify-center h-16 w-16 shrink-0 select-none">
-                <svg className="h-16 w-16 -rotate-90">
-                  <circle
-                    className="text-neutral-200 dark:text-neutral-800 stroke-[4px]"
-                    fill="transparent"
-                    stroke="currentColor"
-                    r={24}
-                    cx={32}
-                    cy={32}
-                  />
-                  <circle
-                    className="text-text-primary transition-all duration-500 ease-out stroke-[4px]"
-                    strokeDasharray={2 * Math.PI * 24}
-                    style={{ strokeDashoffset: (2 * Math.PI * 24) - (percentage / 100) * (2 * Math.PI * 24) }}
-                    strokeLinecap="round"
-                    fill="transparent"
-                    stroke="currentColor"
-                    r={24}
-                    cx={32}
-                    cy={32}
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center justify-center">
-                  <span className="text-[10px] font-black text-text-primary font-poppins leading-none">
-                    {completedCount}/{totalCount}
+              <div className="flex flex-wrap items-center gap-1.5 select-none pt-1">
+                <span className="bg-text-primary text-bg-primary px-2.5 py-1 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
+                  {welcomeDoneTotal}/{totalCount} Done
+                </span>
+                {welcomeCompleted > 0 && (
+                  <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2.5 py-1 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
+                    {welcomeCompleted} Completed
                   </span>
-                  <span className="text-[7px] text-neutral-500 font-bold uppercase tracking-wider mt-0.5 leading-none">
-                    Done
+                )}
+                {welcomeSkipped > 0 && (
+                  <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2.5 py-1 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
+                    {welcomeSkipped} Skipped
                   </span>
-                </div>
+                )}
+                {welcomeJustified > 0 && (
+                  <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2.5 py-1 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
+                    {welcomeJustified} Justified
+                  </span>
+                )}
+                {welcomeFrozen > 0 && (
+                  <span className="bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2.5 py-1 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
+                    {welcomeFrozen} Frozen
+                  </span>
+                )}
+                {welcomePending > 0 && (
+                  <span className="bg-red-500/10 text-red-500 border border-red-500/20 px-2.5 py-1 rounded-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
+                    {welcomePending} Pending
+                  </span>
+                )}
               </div>
             )}
-
-            <div>
-              <h1 className="text-2xl font-black font-poppins text-text-primary tracking-tight">
-                Welcome, {profile.display_name}
-              </h1>
-              <p className="text-xs text-neutral-500 font-semibold select-none mt-0.5">
-                {formatFriendlyDate(selectedDate)}, Ends at 5AM
-              </p>
-            </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 self-stretch sm:self-auto select-none">
-            <div className="flex items-center gap-1.5 px-3 py-2 bg-neutral-100 dark:bg-neutral-900/50 border border-border-primary rounded-lg text-xs font-bold text-cyan-400 uppercase tracking-wider">
-              <Shield className="h-3.5 w-3.5 fill-cyan-400/20" />
-              <span>Shields: {profile.streak_shields}</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
-      {/* Habits Header & Quick Action */}
-      <div className="flex justify-between items-center pt-2">
-        <div>
-          <h2 className="text-lg font-bold font-poppins text-text-primary select-none">Daily Routines</h2>
-          <p className="text-xs text-neutral-500 select-none">Complete habits before 5:00 AM to keep your streak going</p>
-        </div>
-        
-        <button
-          onClick={() => setShowHabitForm(true)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-btn-primary-bg text-btn-primary-text font-extrabold text-xs rounded-lg font-poppins hover:bg-btn-primary-hover transition-colors shadow-lg cursor-pointer select-none"
-        >
-          <Plus className="h-4 w-4 stroke-[3px]" />
-          <span>New Habit</span>
-        </button>
-      </div>
 
       {/* Horizontal Date Picker */}
       <div className="flex gap-2 pb-2 overflow-x-auto select-none pt-1 scrollbar-none">
@@ -865,39 +880,46 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
 
           // Calculate consistency stats for this specific day
           let dayCompletedCount = 0;
-          let dayTotalCount = 0;
-          const dayHasFreeze = freezes.some(f => f.logical_date === dStr);
-          let dayHasSkip = false;
-          let dayHasJustified = false;
-
-          activeHabits.forEach(h => {
+          const dayScheduledHabits = getFilteredScheduledHabitsForDate(dStr);
+          let dayTotalCount = dayScheduledHabits.length;
+          dayScheduledHabits.forEach(h => {
             const log = logs.find(l => l.habit_id === h.id && l.logical_date === dStr);
-            dayTotalCount++;
-            if (log) {
-              if (log.is_skipped) dayHasSkip = true;
-              if (log.is_justified) dayHasJustified = true;
-              if (log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
+            const isFrozen = freezes.some(f => f.logical_date === dStr && f.habit_id === h.id);
+            if (isFrozen) {
+              dayCompletedCount++;
+            } else if (log) {
+              if (log.is_skipped) {
+                dayCompletedCount++;
+              } else if (log.is_justified) {
+                dayCompletedCount++;
+              } else if (log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
                 dayCompletedCount++;
               }
             }
           });
           
           const dayPercentage = dayTotalCount > 0 ? (dayCompletedCount / dayTotalCount) : 0;
+          const isHighCompletion = dayPercentage >= 0.8;
           
           return (
             <button
               key={dStr}
               onClick={() => setSelectedDate(dStr)}
-              className={`flex flex-col items-center justify-center py-2 px-3 rounded-xl border transition-all cursor-pointer min-w-[62px] ${
+              className={`relative flex flex-col items-center justify-center py-2 px-3 rounded-xl border transition-all cursor-pointer min-w-[62px] ${
                 isSelected 
                   ? 'bg-btn-primary-bg border-btn-primary-bg text-btn-primary-text font-black scale-105 shadow-md' 
+                  : isHighCompletion
+                  ? 'bg-emerald-500/[0.03] border-emerald-500/35 hover:border-emerald-500/60 text-neutral-450 hover:text-text-primary'
                   : 'bg-card-bg border-border-primary text-neutral-450 hover:border-border-hover hover:text-text-primary'
               }`}
             >
-              <span className="text-[9px] uppercase tracking-wider font-extrabold opacity-80">
+              {isHighCompletion && (
+                <Check className="h-3 w-3 text-emerald-500 absolute top-1 right-1 stroke-[3px]" />
+              )}
+              <span className={`text-[9px] uppercase tracking-wider font-extrabold ${!isSelected && isHighCompletion ? 'text-emerald-600/80 dark:text-emerald-400/80' : 'opacity-80'}`}>
                 {dayName}
               </span>
-              <span className="text-sm font-black font-poppins mt-0.5">
+              <span className={`text-sm font-black font-poppins mt-0.5 ${!isSelected && isHighCompletion ? 'text-emerald-600 dark:text-emerald-400' : ''}`}>
                 {dayNum}
               </span>
               {isToday && (
@@ -910,14 +932,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
                 <div className="w-full h-1 bg-neutral-200 dark:bg-neutral-800 rounded-full mt-2 overflow-hidden border border-border-primary/20 shrink-0">
                   <div 
                     className={`h-full rounded-full transition-all duration-300 ${
-                      dayPercentage === 1
-                        ? 'bg-amber-400'
-                        : dayHasFreeze
-                        ? 'bg-sky-400'
-                        : dayHasSkip
-                        ? 'bg-amber-600'
-                        : dayHasJustified
-                        ? 'bg-purple-550'
+                      isHighCompletion
+                        ? 'bg-emerald-500 dark:bg-emerald-400'
                         : isSelected
                         ? 'bg-btn-primary-text'
                         : 'bg-text-primary opacity-60'
@@ -954,7 +970,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
                 : 'border-transparent text-neutral-500 hover:text-neutral-400'
             }`}
           >
-            Wellbeing Trackers
+            Wellbeing
           </button>
         </div>
       )}
@@ -2174,176 +2190,88 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
                   </p>
                 </div>
               </div>
-
-              {/* View Toggle */}
-              <div className="flex items-center bg-neutral-100 dark:bg-neutral-900 p-0.5 border border-border-primary rounded-xl">
-                <button
-                  onClick={() => setSleepViewMode('input')}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
-                    sleepViewMode === 'input'
-                      ? 'bg-white dark:bg-neutral-800 text-indigo-500 shadow-sm'
-                      : 'text-neutral-500 hover:text-neutral-400'
-                  }`}
-                >
-                  <Sliders className="h-3 w-3" />
-                  <span>Log</span>
-                </button>
-                <button
-                  onClick={() => setSleepViewMode('chart')}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
-                    sleepViewMode === 'chart'
-                      ? 'bg-white dark:bg-neutral-800 text-indigo-500 shadow-sm'
-                      : 'text-neutral-500 hover:text-neutral-400'
-                  }`}
-                >
-                  <Activity className="h-3 w-3" />
-                  <span>Chart</span>
-                </button>
-              </div>
             </div>
 
-            {sleepViewMode === 'input' ? (
-              /* Input View */
-              <div className="space-y-4 mt-4 select-none">
-                {/* Row 1: Circular progress ring & details */}
-                <div className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 p-3 border border-border-primary/50 rounded-xl gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="relative flex items-center justify-center h-14 w-14 shrink-0 select-none">
-                      <svg className="h-14 w-14 -rotate-90">
-                        <circle
-                          className="text-neutral-200 dark:text-neutral-800 stroke-[4px]"
-                          fill="transparent"
-                          stroke="currentColor"
-                          r={22}
-                          cx={28}
-                          cy={28}
-                        />
-                        <circle
-                          className="text-indigo-500 transition-all duration-500 ease-out stroke-[4px] drop-shadow-[0_0_3px_rgba(99,102,241,0.25)]"
-                          strokeDasharray={2 * Math.PI * 22}
-                          style={{ strokeDashoffset: (2 * Math.PI * 22) - (Math.min(100, (sleepDuration / 8) * 100) / 100) * (2 * Math.PI * 22) }}
-                          strokeLinecap="round"
-                          fill="transparent"
-                          stroke="currentColor"
-                          r={22}
-                          cx={28}
-                          cy={28}
-                        />
-                      </svg>
-                      <div className="absolute flex flex-col items-center justify-center">
-                        <span className="text-[10px] font-black text-text-primary font-poppins leading-none">
-                          {Math.round((sleepDuration / 8) * 100)}%
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <h4 className="text-[8px] uppercase font-bold text-neutral-600 dark:text-neutral-400 tracking-wider">Sleep Quality</h4>
-                      <div className="text-xs font-extrabold text-text-primary font-poppins leading-none">
-                        {sleepDuration} Hrs <span className="text-neutral-500 text-[9px] font-normal">/ 8.00 Hrs</span>
-                      </div>
+            {/* Input View */}
+            <div className="space-y-4 mt-4 select-none">
+              {/* Row 1: Circular progress ring & details */}
+              <div className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 p-3 border border-border-primary/50 rounded-xl gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="relative flex items-center justify-center h-14 w-14 shrink-0 select-none">
+                    <svg className="h-14 w-14 -rotate-90">
+                      <circle
+                        className="text-neutral-200 dark:text-neutral-800 stroke-[4px]"
+                        fill="transparent"
+                        stroke="currentColor"
+                        r={22}
+                        cx={28}
+                        cy={28}
+                      />
+                      <circle
+                        className="text-indigo-500 transition-all duration-500 ease-out stroke-[4px] drop-shadow-[0_0_3px_rgba(99,102,241,0.25)]"
+                        strokeDasharray={2 * Math.PI * 22}
+                        style={{ strokeDashoffset: (2 * Math.PI * 22) - (Math.min(100, (sleepDuration / 8) * 100) / 100) * (2 * Math.PI * 22) }}
+                        strokeLinecap="round"
+                        fill="transparent"
+                        stroke="currentColor"
+                        r={22}
+                        cx={28}
+                        cy={28}
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center justify-center">
+                      <span className="text-[10px] font-black text-text-primary font-poppins leading-none">
+                        {Math.round((sleepDuration / 8) * 100)}%
+                      </span>
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <span className="text-[8px] font-black uppercase text-indigo-500 leading-none block whitespace-pre-line">
-                      {sleepDuration >= 8 ? 'Target Met! 🎉' : `${(8 - sleepDuration).toFixed(2)} Hrs\nLeft`}
-                    </span>
+                  <div className="space-y-0.5">
+                    <h4 className="text-[8px] uppercase font-bold text-neutral-600 dark:text-neutral-400 tracking-wider">Sleep Quality</h4>
+                    <div className="text-xs font-extrabold text-text-primary font-poppins leading-none">
+                      {sleepDuration} Hrs <span className="text-neutral-500 text-[9px] font-normal">/ 8.00 Hrs</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Row 2: Time inputs */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Slept At */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[8px] font-black uppercase text-neutral-500 tracking-wider">Slept At</label>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl focus-within:border-indigo-500 transition-colors">
-                      <Clock className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-                      <input
-                        type="time"
-                        value={sleepStart}
-                        onChange={(e) => setSleepStart(e.target.value)}
-                        className="bg-transparent text-xs text-text-primary font-poppins font-semibold outline-none w-full border-none p-0 cursor-pointer"
-                      />
-                    </div>
-                  </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[8px] font-black uppercase text-indigo-500 leading-none block whitespace-pre-line">
+                    {sleepDuration >= 8 ? 'Target Met! 🎉' : `${(8 - sleepDuration).toFixed(2)} Hrs\nLeft`}
+                  </span>
+                </div>
+              </div>
 
-                  {/* Woke At */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[8px] font-black uppercase text-neutral-500 tracking-wider">Woke At</label>
-                    <div className="flex items-center gap-2 px-3 py-2 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl focus-within:border-indigo-500 transition-colors">
-                      <Clock className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
-                      <input
-                        type="time"
-                        value={sleepEnd}
-                        onChange={(e) => setSleepEnd(e.target.value)}
-                        className="bg-transparent text-xs text-text-primary font-poppins font-semibold outline-none w-full border-none p-0 cursor-pointer"
-                      />
-                    </div>
+              {/* Row 2: Time inputs */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Slept At */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[8px] font-black uppercase text-neutral-500 tracking-wider">Slept At</label>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl focus-within:border-indigo-500 transition-colors">
+                    <Clock className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                    <input
+                      type="time"
+                      value={sleepStart}
+                      onChange={(e) => setSleepStart(e.target.value)}
+                      className="bg-transparent text-xs text-text-primary font-poppins font-semibold outline-none w-full border-none p-0 cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                {/* Woke At */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[8px] font-black uppercase text-neutral-500 tracking-wider">Woke At</label>
+                  <div className="flex items-center gap-2 px-3 py-2 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl focus-within:border-indigo-500 transition-colors">
+                    <Clock className="h-3.5 w-3.5 text-neutral-400 shrink-0" />
+                    <input
+                      type="time"
+                      value={sleepEnd}
+                      onChange={(e) => setSleepEnd(e.target.value)}
+                      className="bg-transparent text-xs text-text-primary font-poppins font-semibold outline-none w-full border-none p-0 cursor-pointer"
+                    />
                   </div>
                 </div>
               </div>
-            ) : (
-              /* Chart View */
-              <div className="mt-4 bg-neutral-50 dark:bg-neutral-900/50 p-4 border border-border-primary/50 rounded-xl select-none">
-                <span className="text-[9px] uppercase font-extrabold text-neutral-600 dark:text-neutral-400 tracking-wider leading-none">
-                  Weekly Sleep Duration (Hours)
-                </span>
-                <div className="h-28 mt-2 flex items-center justify-center">
-                  {(() => {
-                    const svgW = 450;
-                    const svgH = 100;
-                    const pad = { top: 15, bottom: 20, left: 30, right: 15 };
-                    const pts = sleepChartData.map((d, i) => {
-                      const x = pad.left + (i / 6) * (svgW - pad.left - pad.right);
-                      const y = pad.top + (1 - Math.min(12, d.hours) / 12) * (svgH - pad.top - pad.bottom);
-                      return { x, y, hours: d.hours, label: d.label };
-                    });
-                    const lPath = getLinePath(pts);
-                    const aPath = getAreaPath(pts, svgH - pad.bottom);
-
-                    return (
-                      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-full overflow-visible">
-                        <defs>
-                          <linearGradient id="sleepGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#6366f1" stopOpacity="0.25" />
-                            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.0" />
-                          </linearGradient>
-                        </defs>
-                        {/* Horizontal Gridlines */}
-                        <line x1={pad.left} y1={pad.top} x2={svgW - pad.right} y2={pad.top} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" strokeDasharray="3,3" />
-                        <line x1={pad.left} y1={pad.top + (svgH - pad.top - pad.bottom) / 2} x2={svgW - pad.right} y2={pad.top + (svgH - pad.top - pad.bottom) / 2} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" strokeDasharray="3,3" />
-                        <line x1={pad.left} y1={svgH - pad.bottom} x2={svgW - pad.right} y2={svgH - pad.bottom} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" />
-
-                        {/* Y-Axis Labels */}
-                        <text x={pad.left - 6} y={pad.top + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">12h</text>
-                        <text x={pad.left - 6} y={pad.top + (svgH - pad.top - pad.bottom) / 2 + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">6h</text>
-                        <text x={pad.left - 6} y={svgH - pad.bottom + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">0h</text>
-
-                        {/* Area & Line */}
-                        {pts.length > 0 && <path d={aPath} fill="url(#sleepGrad)" />}
-                        {pts.length > 0 && <path d={lPath} fill="none" stroke="#6366f1" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
-
-                        {/* Dots & Values */}
-                        {pts.map((p, idx) => (
-                          <g key={idx}>
-                            <circle cx={p.x} cy={p.y} r="3.5" fill="#6366f1" />
-                            {p.hours > 0 && (
-                              <text x={p.x} y={p.y - 7} textAnchor="middle" className="text-[8px] font-black fill-indigo-500 dark:fill-indigo-400">
-                                {p.hours.toFixed(1)}
-                              </text>
-                            )}
-                            <text x={p.x} y={svgH - 4} textAnchor="middle" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">
-                              {p.label}
-                            </text>
-                          </g>
-                        ))}
-                      </svg>
-                    );
-                  })()}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-border-primary/50">
@@ -2382,244 +2310,143 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
                   </p>
                 </div>
               </div>
-
-              {/* View Toggle */}
-              <div className="flex items-center bg-neutral-100 dark:bg-neutral-900 p-0.5 border border-border-primary rounded-xl">
-                <button
-                  onClick={() => setMoodViewMode('input')}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
-                    moodViewMode === 'input'
-                      ? 'bg-white dark:bg-neutral-800 text-amber-500 shadow-sm'
-                      : 'text-neutral-500 hover:text-neutral-400'
-                  }`}
-                >
-                  <Sliders className="h-3 w-3" />
-                  <span>Log</span>
-                </button>
-                <button
-                  onClick={() => setMoodViewMode('chart')}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
-                    moodViewMode === 'chart'
-                      ? 'bg-white dark:bg-neutral-800 text-amber-500 shadow-sm'
-                      : 'text-neutral-500 hover:text-neutral-400'
-                  }`}
-                >
-                  <Activity className="h-3 w-3" />
-                  <span>Chart</span>
-                </button>
-              </div>
             </div>
 
-            {moodViewMode === 'input' ? (
-              /* Input View */
-              <div className="mt-4 select-none">
-                {/* Phase Selection Tabs */}
-                <div className="flex border-b border-border-primary/50 gap-2 mb-3">
-                  {[
-                    { id: 'phase_1', label: 'Phase 1' },
-                    { id: 'phase_2', label: 'Phase 2' },
-                    { id: 'phase_3', label: 'Phase 3' },
-                    { id: 'phase_4', label: 'Phase 4' }
-                  ].map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setMoodActivePhase(tab.id as any)}
-                      className={`pb-1 text-[9px] font-extrabold uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
-                        moodActivePhase === tab.id
-                          ? 'border-amber-500 text-amber-500'
-                          : 'border-transparent text-neutral-500 hover:text-neutral-400'
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Mood & Energy Selectors */}
-                <div className="grid grid-cols-1 gap-3.5">
-                  {/* Mood selector */}
-                  <div className="space-y-1">
-                    <span className="text-[9px] uppercase font-extrabold text-neutral-600 dark:text-neutral-400 tracking-wider leading-none">
-                      Mood for {moodActivePhase.toUpperCase().replace('_', ' ')}
-                    </span>
-                     <div className="grid grid-cols-5 gap-1.5">
-                      {[
-                        { 
-                          value: 'depressed', 
-                          icon: CloudRain, 
-                          label: 'Down', 
-                          activeClass: 'bg-sky-50/80 dark:bg-sky-950/30 border-sky-400 dark:border-sky-500 text-sky-600 dark:text-sky-400 shadow-sm shadow-sky-500/5', 
-                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-sky-550 hover:border-sky-300 dark:hover:border-sky-800 hover:bg-sky-50/30 dark:hover:bg-sky-950/10' 
-                        },
-                        { 
-                          value: 'sad', 
-                          icon: Frown, 
-                          label: 'Sad', 
-                          activeClass: 'bg-indigo-50/80 dark:bg-indigo-950/30 border-indigo-400 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400 shadow-sm shadow-indigo-500/5', 
-                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-indigo-550 hover:border-indigo-300 dark:hover:border-indigo-800 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/10' 
-                        },
-                        { 
-                          value: 'okay', 
-                          icon: Meh, 
-                          label: 'Okay', 
-                          activeClass: 'bg-neutral-100 dark:bg-neutral-800/80 border-neutral-400 dark:border-neutral-600 text-neutral-600 dark:text-neutral-300 shadow-sm', 
-                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-neutral-600 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30' 
-                        },
-                        { 
-                          value: 'happy', 
-                          icon: Smile, 
-                          label: 'Happy', 
-                          activeClass: 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500 text-amber-600 dark:text-amber-400 shadow-sm shadow-amber-500/5', 
-                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-amber-550 hover:border-amber-300 dark:hover:border-amber-800 hover:bg-amber-50/30 dark:hover:bg-amber-950/10' 
-                        },
-                        { 
-                          value: 'hyperactive', 
-                          icon: Zap, 
-                          label: 'Hyper', 
-                          activeClass: 'bg-rose-50/85 dark:bg-rose-950/30 border-rose-400 dark:border-rose-500 text-rose-650 dark:text-rose-450 shadow-sm shadow-rose-500/5', 
-                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-rose-550 hover:border-rose-300 dark:hover:border-rose-800 hover:bg-rose-50/30 dark:hover:bg-rose-950/10' 
-                        }
-                      ].map(m => {
-                        const MoodIcon = m.icon;
-                        const isActive = selectedMood === m.value;
-                        return (
-                          <button
-                            key={m.value}
-                            onClick={() => setSelectedMood(m.value as any)}
-                            className={`h-11 border rounded-xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
-                              isActive
-                                ? `${m.activeClass} scale-105 font-bold`
-                                : m.inactiveClass
-                            }`}
-                          >
-                            <MoodIcon className="h-4.5 w-4.5" />
-                            <span className="text-[7px] font-extrabold uppercase mt-1 tracking-wider leading-none">{m.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Energy selector */}
-                  <div className="space-y-1">
-                    <span className="text-[9px] uppercase font-extrabold text-neutral-600 dark:text-neutral-400 tracking-wider leading-none">
-                      Energy for {moodActivePhase.toUpperCase().replace('_', ' ')}
-                    </span>
-                    <div className="grid grid-cols-3 gap-2">
-                      {[
-                        { 
-                          value: 'low', 
-                          label: 'Low', 
-                          activeClass: 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm', 
-                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-blue-500 hover:border-blue-300 dark:hover:border-blue-800 hover:bg-blue-50/30 dark:hover:bg-blue-950/10' 
-                        },
-                        { 
-                          value: 'medium', 
-                          label: 'Medium', 
-                          activeClass: 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500 text-amber-600 dark:text-amber-450 shadow-sm', 
-                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-amber-500 hover:border-amber-300 dark:hover:border-amber-800 hover:bg-amber-50/30 dark:hover:bg-amber-950/10' 
-                        },
-                        { 
-                          value: 'high', 
-                          label: 'High', 
-                          activeClass: 'bg-emerald-50/85 dark:bg-emerald-950/30 border-emerald-400 dark:border-emerald-500 text-emerald-650 dark:text-emerald-400 shadow-sm', 
-                          inactiveClass: 'border-border-primary text-neutral-450 hover:text-emerald-550 hover:border-emerald-300 dark:hover:border-emerald-800 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10' 
-                        }
-                      ].map(e => {
-                        const isActive = selectedEnergy === e.value;
-                        return (
-                          <button
-                            key={e.value}
-                            onClick={() => setSelectedEnergy(e.value as any)}
-                            className={`h-10 border rounded-xl flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
-                              isActive
-                                ? `${e.activeClass} scale-105 font-bold`
-                                : e.inactiveClass
-                            }`}
-                          >
-                            <Battery className="h-4.5 w-4.5" />
-                            <span className="text-[9px] font-bold uppercase tracking-wider">{e.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
+            {/* Input View */}
+            <div className="mt-4 select-none">
+              {/* Phase Selection Tabs */}
+              <div className="flex border-b border-border-primary/50 gap-2 mb-3">
+                {[
+                  { id: 'phase_1', label: 'Phase 1' },
+                  { id: 'phase_2', label: 'Phase 2' },
+                  { id: 'phase_3', label: 'Phase 3' },
+                  { id: 'phase_4', label: 'Phase 4' }
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setMoodActivePhase(tab.id as any)}
+                    className={`pb-1 text-[9px] font-extrabold uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+                      moodActivePhase === tab.id
+                        ? 'border-amber-500 text-amber-500'
+                        : 'border-transparent text-neutral-500 hover:text-neutral-400'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
-            ) : (
-              /* Chart View */
-              <div className="mt-4 bg-neutral-50 dark:bg-neutral-900/50 p-4 border border-border-primary/50 rounded-xl select-none">
-                <div className="flex justify-between items-center">
+
+              {/* Mood & Energy Selectors */}
+              <div className="grid grid-cols-1 gap-3.5">
+                {/* Mood selector */}
+                <div className="space-y-1">
                   <span className="text-[9px] uppercase font-extrabold text-neutral-600 dark:text-neutral-400 tracking-wider leading-none">
-                    Weekly Wellbeing (Daily Avg)
+                    Mood for {moodActivePhase.toUpperCase().replace('_', ' ')}
                   </span>
-                  <div className="flex items-center gap-2 text-[8px] font-extrabold uppercase">
-                    <span className="flex items-center gap-1 text-amber-500">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" /> Mood (1-5)
-                    </span>
-                    <span className="flex items-center gap-1 text-green-500">
-                      <span className="w-1.5 h-1.5 rounded-full bg-green-500" /> Energy (1-3)
-                    </span>
+                   <div className="grid grid-cols-5 gap-1.5">
+                    {[
+                      { 
+                        value: 'depressed', 
+                        icon: CloudRain, 
+                        label: 'Down', 
+                        activeClass: 'bg-sky-50/80 dark:bg-sky-950/30 border-sky-400 dark:border-sky-500 text-sky-600 dark:text-sky-400 shadow-sm shadow-sky-500/5', 
+                        inactiveClass: 'border-border-primary text-neutral-450 hover:text-sky-555 hover:border-sky-300 dark:hover:border-sky-800 hover:bg-sky-50/30 dark:hover:bg-sky-950/10' 
+                      },
+                      { 
+                        value: 'sad', 
+                        icon: Frown, 
+                        label: 'Sad', 
+                        activeClass: 'bg-indigo-50/80 dark:bg-indigo-950/30 border-indigo-400 dark:border-indigo-500 text-indigo-600 dark:text-indigo-400 shadow-sm shadow-indigo-500/5', 
+                        inactiveClass: 'border-border-primary text-neutral-450 hover:text-indigo-555 hover:border-indigo-300 dark:hover:border-indigo-800 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/10' 
+                      },
+                      { 
+                        value: 'okay', 
+                        icon: Meh, 
+                        label: 'Okay', 
+                        activeClass: 'bg-neutral-100 dark:bg-neutral-800/80 border-neutral-400 dark:border-neutral-600 text-neutral-600 dark:text-neutral-300 shadow-sm', 
+                        inactiveClass: 'border-border-primary text-neutral-450 hover:text-neutral-650 hover:border-neutral-300 dark:hover:border-neutral-700 hover:bg-neutral-50/50 dark:hover:bg-neutral-800/30' 
+                      },
+                      { 
+                        value: 'happy', 
+                        icon: Smile, 
+                        label: 'Happy', 
+                        activeClass: 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500 text-amber-600 dark:text-amber-400 shadow-sm shadow-amber-500/5', 
+                        inactiveClass: 'border-border-primary text-neutral-450 hover:text-amber-550 hover:border-amber-300 dark:hover:border-amber-800 hover:bg-amber-50/30 dark:hover:bg-amber-950/10' 
+                      },
+                      { 
+                        value: 'hyperactive', 
+                        icon: Zap, 
+                        label: 'Hyper', 
+                        activeClass: 'bg-rose-50/85 dark:bg-rose-950/30 border-rose-400 dark:border-rose-500 text-rose-650 dark:text-rose-450 shadow-sm shadow-rose-500/5', 
+                        inactiveClass: 'border-border-primary text-neutral-450 hover:text-rose-555 hover:border-rose-305 dark:hover:border-rose-800 hover:bg-rose-50/30 dark:hover:bg-rose-950/10' 
+                      }
+                    ].map(m => {
+                      const MoodIcon = m.icon;
+                      const isActive = selectedMood === m.value;
+                      return (
+                        <button
+                          key={m.value}
+                          onClick={() => setSelectedMood(m.value as any)}
+                          className={`h-11 border rounded-xl flex flex-col items-center justify-center transition-all duration-200 cursor-pointer ${
+                            isActive
+                              ? `${m.activeClass} scale-105 font-bold`
+                              : m.inactiveClass
+                          }`}
+                        >
+                          <MoodIcon className="h-4.5 w-4.5" />
+                          <span className="text-[7px] font-extrabold uppercase mt-1 tracking-wider leading-none">{m.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="h-28 mt-2 flex items-center justify-center">
-                  {(() => {
-                    const svgW = 450;
-                    const svgH = 100;
-                    const pad = { top: 15, bottom: 20, left: 30, right: 15 };
-                    
-                    const mPts = moodChartData.map((d, i) => {
-                      const x = pad.left + (i / 6) * (svgW - pad.left - pad.right);
-                      const y = pad.top + (1 - (d.mood || 0) / 5) * (svgH - pad.top - pad.bottom);
-                      return { x, y, val: d.mood, label: d.label };
-                    });
-
-                    const ePts = moodChartData.map((d, i) => {
-                      const x = pad.left + (i / 6) * (svgW - pad.left - pad.right);
-                      const y = pad.top + (1 - (d.energy || 0) / 3) * (svgH - pad.top - pad.bottom);
-                      return { x, y, val: d.energy, label: d.label };
-                    });
-
-                    const mLine = getLinePath(mPts);
-                    const eLine = getLinePath(ePts);
-
-                    return (
-                      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-full overflow-visible">
-                        {/* Horizontal Gridlines */}
-                        <line x1={pad.left} y1={pad.top} x2={svgW - pad.right} y2={pad.top} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" strokeDasharray="3,3" />
-                        <line x1={pad.left} y1={pad.top + (svgH - pad.top - pad.bottom) / 2} x2={svgW - pad.right} y2={pad.top + (svgH - pad.top - pad.bottom) / 2} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" strokeDasharray="3,3" />
-                        <line x1={pad.left} y1={svgH - pad.bottom} x2={svgW - pad.right} y2={svgH - pad.bottom} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" />
-
-                        {/* Y-Axis Labels */}
-                        <text x={pad.left - 6} y={pad.top + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">Max</text>
-                        <text x={pad.left - 6} y={pad.top + (svgH - pad.top - pad.bottom) / 2 + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">Mid</text>
-                        <text x={pad.left - 6} y={svgH - pad.bottom + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">Min</text>
-
-                        {/* Lines */}
-                        {mPts.length > 0 && <path d={mLine} fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-                        {ePts.length > 0 && <path d={eLine} fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />}
-
-                        {/* Dots */}
-                        {mPts.map((p, idx) => (
-                          <circle key={`m-${idx}`} cx={p.x} cy={p.y} r="2.5" fill="#f59e0b" />
-                        ))}
-                        {ePts.map((p, idx) => (
-                          <circle key={`e-${idx}`} cx={p.x} cy={p.y} r="2.5" fill="#10b981" />
-                        ))}
-
-                        {/* X-Axis Date Labels */}
-                        {mPts.map((p, idx) => (
-                          <text key={`l-${idx}`} x={p.x} y={svgH - 4} textAnchor="middle" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">
-                            {p.label}
-                          </text>
-                        ))}
-                      </svg>
-                    );
-                  })()}
+                {/* Energy selector */}
+                <div className="space-y-1">
+                  <span className="text-[9px] uppercase font-extrabold text-neutral-600 dark:text-neutral-400 tracking-wider leading-none">
+                    Energy for {moodActivePhase.toUpperCase().replace('_', ' ')}
+                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { 
+                        value: 'low', 
+                        label: 'Low', 
+                        activeClass: 'bg-blue-50/80 dark:bg-blue-950/30 border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400 shadow-sm', 
+                        inactiveClass: 'border-border-primary text-neutral-450 hover:text-blue-500 hover:border-blue-300 dark:hover:border-blue-800 hover:bg-blue-50/30 dark:hover:bg-blue-950/10' 
+                      },
+                      { 
+                        value: 'medium', 
+                        label: 'Medium', 
+                        activeClass: 'bg-amber-50/80 dark:bg-amber-950/30 border-amber-400 dark:border-amber-500 text-amber-600 dark:text-amber-450 shadow-sm', 
+                        inactiveClass: 'border-border-primary text-neutral-450 hover:text-amber-550 hover:border-amber-300 dark:hover:border-amber-800 hover:bg-amber-50/30 dark:hover:bg-amber-950/10' 
+                      },
+                      { 
+                        value: 'high', 
+                        label: 'High', 
+                        activeClass: 'bg-emerald-50/85 dark:bg-emerald-950/30 border-emerald-400 dark:border-emerald-500 text-emerald-655 dark:text-emerald-400 shadow-sm', 
+                        inactiveClass: 'border-border-primary text-neutral-450 hover:text-emerald-555 hover:border-emerald-300 dark:hover:border-emerald-800 hover:bg-emerald-50/30 dark:hover:bg-emerald-950/10' 
+                      }
+                    ].map(e => {
+                      const isActive = selectedEnergy === e.value;
+                      return (
+                        <button
+                          key={e.value}
+                          onClick={() => setSelectedEnergy(e.value as any)}
+                          className={`h-10 border rounded-xl flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer ${
+                            isActive
+                              ? `${e.activeClass} scale-105 font-bold`
+                              : e.inactiveClass
+                          }`}
+                        >
+                          <Battery className="h-4.5 w-4.5" />
+                          <span className="text-[9px] font-bold uppercase tracking-wider">{e.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Controls */}
@@ -2659,205 +2486,112 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
                   </p>
                 </div>
               </div>
-
-              {/* View Toggle */}
-              <div className="flex items-center bg-neutral-100 dark:bg-neutral-900 p-0.5 border border-border-primary rounded-xl">
-                <button
-                  onClick={() => setMeditationViewMode('input')}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
-                    meditationViewMode === 'input'
-                      ? 'bg-white dark:bg-neutral-800 text-teal-500 shadow-sm'
-                      : 'text-neutral-500 hover:text-neutral-400'
-                  }`}
-                >
-                  <Sliders className="h-3 w-3" />
-                  <span>Log</span>
-                </button>
-                <button
-                  onClick={() => setMeditationViewMode('chart')}
-                  className={`px-3 py-1.5 rounded-lg text-[9px] font-extrabold uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer ${
-                    meditationViewMode === 'chart'
-                      ? 'bg-white dark:bg-neutral-800 text-teal-500 shadow-sm'
-                      : 'text-neutral-500 hover:text-neutral-400'
-                  }`}
-                >
-                  <Activity className="h-3 w-3" />
-                  <span>Chart</span>
-                </button>
-              </div>
             </div>
 
-            {meditationViewMode === 'input' ? (
-              /* Input View */
-              <div className="space-y-4 mt-4 select-none">
-                {/* Row 1: Circular progress */}
-                <div className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 p-3 border border-border-primary/50 rounded-xl gap-2">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="relative flex items-center justify-center h-14 w-14 shrink-0 select-none">
-                      <svg className="h-14 w-14 -rotate-90">
-                        <circle
-                          className="text-neutral-200 dark:text-neutral-800 stroke-[4px]"
-                          fill="transparent"
-                          stroke="currentColor"
-                          r={22}
-                          cx={28}
-                          cy={28}
-                        />
-                        <circle
-                          className="text-teal-500 transition-all duration-500 ease-out stroke-[4px] drop-shadow-[0_0_3px_rgba(20,184,166,0.25)]"
-                          strokeDasharray={2 * Math.PI * 22}
-                          style={{ strokeDashoffset: (2 * Math.PI * 22) - (Math.min(100, (meditationDuration / meditationTarget) * 100) / 100) * (2 * Math.PI * 22) }}
-                          strokeLinecap="round"
-                          fill="transparent"
-                          stroke="currentColor"
-                          r={22}
-                          cx={28}
-                          cy={28}
-                        />
-                      </svg>
-                      <div className="absolute flex flex-col items-center justify-center">
-                        <span className="text-[10px] font-black text-text-primary font-poppins leading-none">
-                          {Math.round((meditationDuration / meditationTarget) * 100)}%
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="space-y-0.5">
-                      <h4 className="text-[8px] uppercase font-bold text-neutral-600 dark:text-neutral-400 tracking-wider">Mindfulness</h4>
-                      <div className="text-xs font-extrabold text-text-primary font-poppins leading-none">
-                        {meditationDuration} min <span className="text-neutral-500 text-[9px] font-normal">/ {meditationTarget} min</span>
-                      </div>
+            {/* Input View */}
+            <div className="space-y-4 mt-4 select-none">
+              {/* Row 1: Circular progress */}
+              <div className="flex items-center justify-between bg-neutral-50 dark:bg-neutral-900/50 p-3 border border-border-primary/50 rounded-xl gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="relative flex items-center justify-center h-14 w-14 shrink-0 select-none">
+                    <svg className="h-14 w-14 -rotate-90">
+                      <circle
+                        className="text-neutral-200 dark:text-neutral-800 stroke-[4px]"
+                        fill="transparent"
+                        stroke="currentColor"
+                        r={22}
+                        cx={28}
+                        cy={28}
+                      />
+                      <circle
+                        className="text-teal-500 transition-all duration-500 ease-out stroke-[4px] drop-shadow-[0_0_3px_rgba(20,184,166,0.25)]"
+                        strokeDasharray={2 * Math.PI * 22}
+                        style={{ strokeDashoffset: (2 * Math.PI * 22) - (Math.min(100, (meditationDuration / meditationTarget) * 100) / 100) * (2 * Math.PI * 22) }}
+                        strokeLinecap="round"
+                        fill="transparent"
+                        stroke="currentColor"
+                        r={22}
+                        cx={28}
+                        cy={28}
+                      />
+                    </svg>
+                    <div className="absolute flex flex-col items-center justify-center">
+                      <span className="text-[10px] font-black text-text-primary font-poppins leading-none">
+                        {Math.round((meditationDuration / meditationTarget) * 100)}%
+                      </span>
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
-                    <span className="text-[8px] font-black uppercase text-teal-500 leading-none block whitespace-pre-line">
-                      {meditationDuration >= meditationTarget ? 'Zen Master! 🧘' : `${(meditationTarget - meditationDuration).toFixed(0)} min\nleft`}
-                    </span>
+                  <div className="space-y-0.5">
+                    <h4 className="text-[8px] uppercase font-bold text-neutral-600 dark:text-neutral-400 tracking-wider">Mindfulness</h4>
+                    <div className="text-xs font-extrabold text-text-primary font-poppins leading-none">
+                      {meditationDuration} min <span className="text-neutral-500 text-[9px] font-normal">/ {meditationTarget} min</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Row 2: Inputs */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Duration Log */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[8px] font-black uppercase text-neutral-500 tracking-wider">Log Session (Min)</label>
-                    <div className="flex items-center justify-between px-3 py-1 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl focus-within:border-teal-500 transition-colors">
-                      <button
-                        onClick={() => setMeditationDuration(prev => Math.max(0, prev - 5))}
-                        className="text-neutral-500 hover:text-teal-500 text-xs font-black p-1 select-none"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        min="0"
-                        value={meditationDuration}
-                        onChange={(e) => setMeditationDuration(Number(e.target.value))}
-                        className="bg-transparent text-xs text-text-primary font-poppins font-semibold outline-none w-12 text-center border-none p-0 cursor-pointer [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <button
-                        onClick={() => setMeditationDuration(prev => prev + 5)}
-                        className="text-neutral-500 hover:text-teal-500 text-xs font-black p-1 select-none"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
+                <div className="text-right shrink-0">
+                  <span className="text-[8px] font-black uppercase text-teal-500 leading-none block whitespace-pre-line">
+                    {meditationDuration >= meditationTarget ? 'Zen Master! 🧘' : `${(meditationTarget - meditationDuration).toFixed(0)} min\nleft`}
+                  </span>
+                </div>
+              </div>
 
-                  {/* Daily Target Frequency */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[8px] font-black uppercase text-neutral-500 tracking-wider">Daily Goal (Min)</label>
-                    <div className="flex items-center justify-between px-3 py-1 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl focus-within:border-teal-500 transition-colors">
-                      <button
-                        onClick={() => setMeditationTarget(prev => Math.max(1, prev - 5))}
-                        className="text-neutral-500 hover:text-teal-500 text-xs font-black p-1 select-none"
-                      >
-                        -
-                      </button>
-                      <input
-                        type="number"
-                        min="1"
-                        value={meditationTarget}
-                        onChange={(e) => setMeditationTarget(Number(e.target.value))}
-                        className="bg-transparent text-xs text-text-primary font-poppins font-semibold outline-none w-12 text-center border-none p-0 cursor-pointer [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <button
-                        onClick={() => setMeditationTarget(prev => prev + 5)}
-                        className="text-neutral-500 hover:text-teal-500 text-xs font-black p-1 select-none"
-                      >
-                        +
-                      </button>
-                    </div>
+              {/* Row 2: Inputs */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* Duration Log */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[8px] font-black uppercase text-neutral-500 tracking-wider">Log Session (Min)</label>
+                  <div className="flex items-center justify-between px-3 py-1 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl focus-within:border-teal-500 transition-colors">
+                    <button
+                      onClick={() => setMeditationDuration(prev => Math.max(0, prev - 5))}
+                      className="text-neutral-500 hover:text-teal-500 text-xs font-black p-1 select-none"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="0"
+                      value={meditationDuration}
+                      onChange={(e) => setMeditationDuration(Number(e.target.value))}
+                      className="bg-transparent text-xs text-text-primary font-poppins font-semibold outline-none w-12 text-center border-none p-0 cursor-pointer [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button
+                      onClick={() => setMeditationDuration(prev => prev + 5)}
+                      className="text-neutral-500 hover:text-teal-500 text-xs font-black p-1 select-none"
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+
+                {/* Daily Target Frequency */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[8px] font-black uppercase text-neutral-500 tracking-wider">Daily Goal (Min)</label>
+                  <div className="flex items-center justify-between px-3 py-1 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl focus-within:border-teal-500 transition-colors">
+                    <button
+                      onClick={() => setMeditationTarget(prev => Math.max(1, prev - 5))}
+                      className="text-neutral-500 hover:text-teal-500 text-xs font-black p-1 select-none"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min="1"
+                      value={meditationTarget}
+                      onChange={(e) => setMeditationTarget(Number(e.target.value))}
+                      className="bg-transparent text-xs text-text-primary font-poppins font-semibold outline-none w-12 text-center border-none p-0 cursor-pointer [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <button
+                      onClick={() => setMeditationTarget(prev => prev + 5)}
+                      className="text-neutral-550 hover:text-teal-500 text-xs font-black p-1 select-none"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
               </div>
-            ) : (
-              /* Chart View */
-              <div className="mt-4 bg-neutral-50 dark:bg-neutral-900/50 p-4 border border-border-primary/50 rounded-xl select-none">
-                <span className="text-[9px] uppercase font-extrabold text-neutral-600 dark:text-neutral-400 tracking-wider leading-none">
-                  Weekly Meditation History (Minutes)
-                </span>
-                <div className="h-28 mt-2 flex items-center justify-center">
-                  {(() => {
-                    const svgW = 450;
-                    const svgH = 100;
-                    const pad = { top: 15, bottom: 20, left: 30, right: 15 };
-                    
-                    // Max minutes in chart is 60 or max target
-                    const maxVal = Math.max(60, ...meditationChartData.map(d => Math.max(d.duration, d.target)));
-                    
-                    const pts = meditationChartData.map((d, i) => {
-                      const x = pad.left + (i / 6) * (svgW - pad.left - pad.right);
-                      const y = pad.top + (1 - d.duration / maxVal) * (svgH - pad.top - pad.bottom);
-                      return { x, y, duration: d.duration, target: d.target, label: d.label };
-                    });
-
-                    const lPath = getLinePath(pts);
-                    const aPath = getAreaPath(pts, svgH - pad.bottom);
-
-                    return (
-                      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full h-full overflow-visible">
-                        <defs>
-                          <linearGradient id="medGrad" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.25" />
-                            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0.0" />
-                          </linearGradient>
-                        </defs>
-                        {/* Horizontal Gridlines */}
-                        <line x1={pad.left} y1={pad.top} x2={svgW - pad.right} y2={pad.top} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" strokeDasharray="3,3" />
-                        <line x1={pad.left} y1={pad.top + (svgH - pad.top - pad.bottom) / 2} x2={svgW - pad.right} y2={pad.top + (svgH - pad.top - pad.bottom) / 2} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" strokeDasharray="3,3" />
-                        <line x1={pad.left} y1={svgH - pad.bottom} x2={svgW - pad.right} y2={svgH - pad.bottom} className="stroke-neutral-200 dark:stroke-neutral-800" strokeWidth="1" />
-
-                        {/* Y-Axis Labels */}
-                        <text x={pad.left - 6} y={pad.top + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">{maxVal}m</text>
-                        <text x={pad.left - 6} y={pad.top + (svgH - pad.top - pad.bottom) / 2 + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">{Math.round(maxVal / 2)}m</text>
-                        <text x={pad.left - 6} y={svgH - pad.bottom + 3} textAnchor="end" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">0m</text>
-
-                        {/* Area & Line */}
-                        {pts.length > 0 && <path d={aPath} fill="url(#medGrad)" />}
-                        {pts.length > 0 && <path d={lPath} fill="none" stroke="#14b8a6" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />}
-
-                        {/* Dots & Values */}
-                        {pts.map((p, idx) => (
-                          <g key={idx}>
-                            <circle cx={p.x} cy={p.y} r="3.5" fill="#14b8a6" />
-                            {p.duration > 0 && (
-                              <text x={p.x} y={p.y - 7} textAnchor="middle" className="text-[8px] font-black fill-teal-600 dark:fill-teal-400">
-                                {p.duration}m
-                              </text>
-                            )}
-                            <text x={p.x} y={svgH - 4} textAnchor="middle" className="text-[8px] font-bold fill-neutral-400 dark:fill-neutral-500">
-                              {p.label}
-                            </text>
-                          </g>
-                        ))}
-                      </svg>
-                    );
-                  })()}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-border-primary/50">
@@ -2882,147 +2616,245 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits' }) =>
       </div>
       ) : (
       <>
-        {/* Checklist Organizer Toolbar */}
-      {scheduledActiveHabits.length > 0 && (
-        <div className="cred-glass p-4 rounded-2xl border border-border-primary flex flex-col md:flex-row justify-between items-stretch md:items-center gap-4 select-none mb-6">
-          <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-indigo-500 shrink-0">
-              <Sliders className="h-4.5 w-4.5" />
+        {/* Checklist Organizer & Phase Selector Toolbar */}
+        {scheduledActiveHabits.length > 0 && (
+          <div className="cred-glass p-4 rounded-2xl border border-border-primary flex flex-col lg:flex-row justify-between items-center gap-6 select-none mb-6">
+            {/* Left: Phase Circles (only if Group By is 'phase') */}
+            <div className="flex-1 w-full overflow-x-auto scrollbar-none">
+              {groupBy === 'phase' ? (
+                <div className="flex items-center gap-6 justify-start py-1">
+                  {LIFE_PHASES_META.map(phase => {
+                    const phaseHabits = habitsByPhase[phase.id] || [];
+                    const isSelected = selectedPhaseId === phase.id;
+                    const metrics = getHabitListMetrics(phaseHabits);
+                    const total = phaseHabits.length;
+                    
+                    if (total === 0) return null;
+                    
+                    const PhaseIcon = phase.icon;
+                    
+                    // Segmented progress ring around circle representation
+                    const circumference = 2 * Math.PI * 26;
+                    const segmentLength = circumference / total;
+                    const gap = total > 1 ? 1.5 : 0;
+                    const dashArray = `${segmentLength - gap} ${circumference - (segmentLength - gap)}`;
+                    
+                    return (
+                      <button
+                        key={phase.id}
+                        onClick={() => setSelectedPhaseId(phase.id)}
+                        className="flex flex-col items-center gap-2 focus:outline-none group shrink-0 cursor-pointer"
+                      >
+                        {/* Story Circle representation */}
+                        <div className="relative flex items-center justify-center h-14 w-14 select-none">
+                          <svg className="absolute h-14 w-14 -rotate-90">
+                            {phaseHabits.map((h, idx) => {
+                              const log = logs.find(l => l.habit_id === h.id && l.logical_date === selectedDate);
+                              const isFrozen = freezes.some(f => f.logical_date === selectedDate && f.habit_id === h.id);
+                              
+                              let colorClass = "text-neutral-200 dark:text-neutral-800"; // pending
+                              if (isFrozen) {
+                                colorClass = "text-sky-400";
+                              } else if (log) {
+                                if (log.is_skipped) {
+                                  colorClass = "text-amber-500";
+                                } else if (log.is_justified) {
+                                  colorClass = "text-purple-500";
+                                } else if (log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version)) {
+                                  colorClass = "text-emerald-500";
+                                }
+                              }
+                              
+                              return (
+                                <circle
+                                  key={h.id}
+                                  className={`${colorClass} transition-all duration-300 stroke-[3px]`}
+                                  strokeDasharray={dashArray}
+                                  strokeDashoffset={-idx * segmentLength}
+                                  strokeLinecap="round"
+                                  fill="transparent"
+                                  stroke="currentColor"
+                                  r={26}
+                                  cx={28}
+                                  cy={28}
+                                />
+                              );
+                            })}
+                          </svg>
+                          
+                          {/* Inner circle phase icon */}
+                          <div className={`h-9 w-9 rounded-full flex items-center justify-center border transition-all duration-200 ${
+                            isSelected 
+                              ? 'bg-neutral-100 dark:bg-neutral-800 border-indigo-500 scale-105 shadow-sm text-indigo-500' 
+                              : 'bg-card-bg border-border-primary text-neutral-500 group-hover:text-text-primary group-hover:border-border-hover'
+                          }`}>
+                            <PhaseIcon className="h-4 w-4" />
+                          </div>
+                        </div>
+                        
+                        {/* Label & completion info */}
+                        <div className="text-center select-none animate-fadeIn">
+                          <span className={`text-[9px] font-black uppercase tracking-wider block transition-colors ${
+                            isSelected ? 'text-indigo-500' : 'text-neutral-500 group-hover:text-text-primary'
+                          }`}>
+                            {PHASE_ROMAN_NAMES[phase.id] || phase.name}
+                          </span>
+                          
+                          <span className="text-[8px] font-extrabold text-neutral-400 dark:text-neutral-500 block mt-0.5 whitespace-nowrap">
+                            {metrics.completed}/{total} Done
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-indigo-500 shrink-0">
+                      <Sliders className="h-4.5 w-4.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black font-poppins text-text-primary uppercase tracking-wider leading-none">
+                        Checklist Organizer
+                      </h4>
+                      <p className="text-[9px] text-neutral-500 font-semibold tracking-wide uppercase mt-1 leading-none">
+                        Customize checklist sorting & grouping
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={() => setShowHabitForm(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-[9px] font-black uppercase tracking-wider rounded-lg text-text-primary hover:border-neutral-400 transition-colors select-none shrink-0 cursor-pointer"
+                  >
+                    <Plus className="h-3.5 w-3.5 stroke-[2.5px] text-neutral-450 dark:text-neutral-550" />
+                    <span>New Habit</span>
+                  </button>
+                </div>
+              )}
             </div>
-            <div>
-              <h4 className="text-xs font-black font-poppins text-text-primary uppercase tracking-wider leading-none">
-                Checklist Organizer
-              </h4>
-              <p className="text-[9px] text-neutral-500 font-semibold tracking-wide uppercase mt-1 leading-none">
-                Customize checklist sorting & grouping
-              </p>
+
+            {/* Right: Filters & dropdowns */}
+            <div className="flex overflow-x-auto scrollbar-none gap-3 w-full lg:w-auto py-0.5 select-none">
+              <CustomDropdown
+                label="Group By"
+                value={groupBy}
+                onChange={(val) => setGroupBy(val as any)}
+                options={[
+                  { value: 'phase', label: 'Circadian Phases' },
+                  { value: 'category', label: 'Habit Categories' },
+                  { value: 'flat', label: 'Consolidated List' }
+                ]}
+              />
+
+              <CustomDropdown
+                label="Sort By"
+                value={sortBy}
+                onChange={(val) => setSortBy(val as any)}
+                options={[
+                  { value: 'default', label: 'Default Phase Wise' },
+                  { value: 'uncompleted', label: 'Uncompleted First' },
+                  { value: 'failing', label: 'Failing First' },
+                  { value: 'alpha', label: 'Alphabetical (A-Z)' }
+                ]}
+              />
+
+              <CustomDropdown
+                label="Filter By"
+                value={filterBy}
+                onChange={(val) => setFilterBy(val as any)}
+                options={[
+                  { value: 'all', label: 'All Habits' },
+                  { value: 'uncompleted', label: 'Uncompleted Only' },
+                  { value: 'completed', label: 'Completed Only' }
+                ]}
+              />
             </div>
           </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Group By selector */}
-            <CustomDropdown
-              label="Group By"
-              value={groupBy}
-              onChange={(val) => setGroupBy(val as any)}
-              options={[
-                { value: 'phase', label: 'Circadian Phases' },
-                { value: 'category', label: 'Habit Categories' },
-                { value: 'flat', label: 'Consolidated List' }
-              ]}
-            />
-
-            {/* Sort By selector */}
-            <CustomDropdown
-              label="Sort By"
-              value={sortBy}
-              onChange={(val) => setSortBy(val as any)}
-              options={[
-                { value: 'default', label: 'Default Phase Wise' },
-                { value: 'uncompleted', label: 'Uncompleted First' },
-                { value: 'failing', label: 'Failing First' },
-                { value: 'alpha', label: 'Alphabetical (A-Z)' }
-              ]}
-            />
-
-            {/* Filter selector */}
-            <CustomDropdown
-              label="Filter By"
-              value={filterBy}
-              onChange={(val) => setFilterBy(val as any)}
-              options={[
-                { value: 'all', label: 'All Habits' },
-                { value: 'uncompleted', label: 'Uncompleted Only' },
-                { value: 'completed', label: 'Completed Only' },
-                { value: 'salah', label: 'Salah Tracker Only' },
-                { value: 'habits', label: 'Habits Only' }
-              ]}
-            />
-          </div>
-        </div>
-      )}
+        )}
 
       {/* Checklist Sections */}
       <div className="space-y-6">
         {scheduledActiveHabits.length > 0 ? (
           <>
-            {groupBy === 'phase' && LIFE_PHASES_META.map(phase => {
-              const phaseHabits = habitsByPhase[phase.id] || [];
-              if (phaseHabits.length === 0) return null;
-              const PhaseIcon = phase.icon;
-              const metrics = getHabitListMetrics(phaseHabits);
-              const isCollapsed = collapsedPhases[phase.id];
+            {groupBy === 'phase' && (
+              <div className="flex flex-col gap-6">
 
-              return (
-                <div key={phase.id} className="space-y-3">
-                  <div 
-                    onClick={() => togglePhaseCollapse(phase.id)}
-                    className="flex items-center justify-between border-b border-border-primary pb-2 select-none cursor-pointer group hover:border-border-hover transition-colors"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-text-primary shrink-0 transition-all group-hover:scale-105">
-                        <PhaseIcon className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-black tracking-wider text-text-primary uppercase font-poppins leading-none flex items-center gap-1.5">
-                          {phase.name}
-                          {isCollapsed ? (
-                            <ChevronRight className="h-3 w-3 text-neutral-500" />
-                          ) : (
-                            <ChevronDown className="h-3 w-3 text-neutral-500" />
+                {/* Selected Phase Habits View */}
+                {(() => {
+                  const activePhase = LIFE_PHASES_META.find(p => p.id === selectedPhaseId);
+                  if (!activePhase) return null;
+                  
+                  const phaseHabits = habitsByPhase[activePhase.id] || [];
+                  const metrics = getHabitListMetrics(phaseHabits);
+                  const total = phaseHabits.length;
+                  
+                  return (
+                    <div className="space-y-4 animate-fadeIn">
+                      {/* Phase Info & Detailed Breakdown */}
+                      <div className="cred-glass p-4 rounded-2xl border border-border-primary/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 select-none">
+                        <div>
+                          <h3 className="text-xs font-black font-poppins text-text-primary uppercase tracking-wider">
+                            {PHASE_ROMAN_NAMES[activePhase.id]} - {activePhase.name}
+                          </h3>
+                          <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider mt-0.5">
+                            {activePhase.desc}
+                          </p>
+                        </div>
+                        
+                        {/* Down show like total, out of info custom design */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[8px] font-black uppercase tracking-wider">
+                          {metrics.completed > 0 && (
+                            <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
+                              {metrics.completed} Completed
+                            </span>
                           )}
-                        </h3>
-                        <p className="text-[9px] text-neutral-500 font-semibold tracking-wider uppercase mt-1 leading-none">
-                          {phase.desc}
-                        </p>
+                          {metrics.skipped > 0 && (
+                            <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-lg">
+                              {metrics.skipped} Skipped
+                            </span>
+                          )}
+                          {metrics.justified > 0 && (
+                            <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-lg">
+                              {metrics.justified} Justified
+                            </span>
+                          )}
+                          {metrics.frozen > 0 && (
+                            <span className="bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded-lg">
+                              {metrics.frozen} Frozen
+                            </span>
+                          )}
+                          {metrics.pending > 0 && (
+                            <span className="bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-neutral-500 px-2 py-0.5 rounded-lg">
+                              {metrics.pending} Pending
+                            </span>
+                          )}
+                          <span className="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded-lg">
+                            {total} {total === 1 ? 'Routine' : 'Routines'} Total
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {/* Habit Cards Grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {phaseHabits.map(habit => (
+                          <HabitCard 
+                            key={habit.id} 
+                            habit={habit} 
+                            selectedDate={selectedDate} 
+                            onEditClick={() => {
+                              setEditHabitId(habit.id);
+                              setShowHabitForm(true);
+                            }}
+                          />
+                        ))}
                       </div>
                     </div>
-
-                    <div className="flex items-center gap-1.5 select-none">
-                      {metrics.completed > 0 && (
-                        <span className="text-[8px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                          {metrics.completed} done
-                        </span>
-                      )}
-                      {metrics.frozen > 0 && (
-                        <span className="text-[8px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                          {metrics.frozen} frozen
-                        </span>
-                      )}
-                      {metrics.justified > 0 && (
-                        <span className="text-[8px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                          {metrics.justified} excused
-                        </span>
-                      )}
-                      {metrics.pending > 0 && (
-                        <span className="text-[8px] bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-neutral-500 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                          {metrics.pending} left
-                        </span>
-                      )}
-                      <span className="text-[9px] bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded-md border border-border-primary text-neutral-500 font-bold uppercase tracking-wider shrink-0 select-none">
-                        {phaseHabits.length} {phaseHabits.length === 1 ? 'routine' : 'routines'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {!isCollapsed && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
-                      {phaseHabits.map(habit => (
-                        <HabitCard 
-                          key={habit.id} 
-                          habit={habit} 
-                          selectedDate={selectedDate} 
-                          onEditClick={() => {
-                            setEditHabitId(habit.id);
-                            setShowHabitForm(true);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                  );
+                })()}
+              </div>
+            )}
 
             {groupBy === 'category' && (
               <>

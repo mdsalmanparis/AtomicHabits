@@ -13,15 +13,20 @@ import {
   Cell,
   AreaChart,
   Area,
-  CartesianGrid
+  CartesianGrid,
+  ReferenceArea
 } from 'recharts';
-import { Trophy, CircleDot, Flame, RefreshCw, Sparkles, Activity, TrendingUp } from 'lucide-react';
+import { Trophy, CircleDot, Flame, RefreshCw, Sparkles, Activity, TrendingUp, Shield } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { getLevelTitle, getTotalXPForLevel } from '../utils/levelUtils';
 
 
 
-export const Analytics: React.FC = () => {
+export interface AnalyticsProps {
+  onNavigate?: (tab: 'habits' | 'growth' | 'analytics' | 'achievements' | 'settings') => void;
+}
+
+export const Analytics: React.FC<AnalyticsProps> = ({ onNavigate }) => {
   const habits = useStore(state => state.habits);
   const logs = useStore(state => state.logs);
   const freezes = useStore(state => state.freezes);
@@ -391,10 +396,13 @@ CRITICAL INSTRUCTIONS:
     const percentage = totalScheduled > 0 ? Math.round((completedCount / totalScheduled) * 100) : 0;
     const dateObj = new Date(dateStr + 'T00:00:00');
     const label = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const dayOfWeek = dateObj.getDay();
+    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
     
     return {
       date: label,
-      percentage
+      percentage,
+      isWeekend
     };
   });
 
@@ -466,7 +474,44 @@ CRITICAL INSTRUCTIONS:
   const identityList = Object.entries(identityVotes).map(([name, votes]) => {
     const level = Math.floor(votes / 10) + 1;
     const votesProgress = votes % 10;
-    return { name, votes, level, votesProgress };
+    
+    // Calculate weekly trend for habits under this identity
+    const habitsForId = activeHabits.filter(h => (h.identity.charAt(0).toUpperCase() + h.identity.slice(1)) === name);
+    
+    // Count completions in last 7 days
+    let current7 = 0;
+    let prev7 = 0;
+    
+    const last7Days = last28Days.slice(-7);
+    last7Days.forEach(day => {
+      habitsForId.forEach(h => {
+        const log = logs.find(l => l.habit_id === h.id && l.logical_date === day);
+        if (log && log.count_completed >= h.target_count && !log.is_skipped) {
+          current7++;
+        }
+      });
+    });
+    
+    const prev7DaysList = Array.from({ length: 7 }, (_, i) => addDays(todayStr, -(i + 7)));
+    prev7DaysList.forEach(day => {
+      habitsForId.forEach(h => {
+        const log = logs.find(l => l.habit_id === h.id && l.logical_date === day);
+        if (log && log.count_completed >= h.target_count && !log.is_skipped) {
+          prev7++;
+        }
+      });
+    });
+    
+    let trend: 'improving' | 'maintaining' | 'starting' = 'starting';
+    if (votes > 0) {
+      if (current7 > prev7) {
+        trend = 'improving';
+      } else {
+        trend = 'maintaining';
+      }
+    }
+    
+    return { name, votes, level, votesProgress, trend };
   });
 
   const pieData = identityList.map(item => ({
@@ -479,25 +524,79 @@ CRITICAL INSTRUCTIONS:
   return (
     <div className="space-y-8 font-sans selection:bg-text-primary selection:text-bg-primary transition-colors">
       
+      {/* Header with Settings & Badges shortcuts */}
+      <div className="flex justify-between items-center border-b border-border-primary pb-3 mb-6 select-none">
+        <div>
+          <h2 className="text-lg font-black font-poppins text-text-primary uppercase tracking-wider">
+            Analytics & Progress
+          </h2>
+          <p className="text-[10px] text-neutral-505 font-semibold uppercase tracking-wider mt-0.5">
+            Your habit loop statistics
+          </p>
+        </div>
+        
+        {/* Settings and badges icons in analytics tab */}
+        <div className="flex items-center gap-2">
+          {onNavigate && (
+            <>
+              <button
+                onClick={() => onNavigate('achievements')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-card-bg border border-border-primary hover:border-border-hover rounded-xl text-[10px] font-bold text-neutral-500 hover:text-text-primary transition-colors cursor-pointer"
+                title="View Badges"
+              >
+                <Trophy className="h-4 w-4 text-amber-500 fill-amber-500/10" />
+                <span>Badges</span>
+              </button>
+              
+              <button
+                onClick={() => onNavigate('settings')}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-card-bg border border-border-primary hover:border-border-hover rounded-xl text-[10px] font-bold text-neutral-500 hover:text-text-primary transition-colors cursor-pointer"
+                title="Settings"
+              >
+                <Icons.Sliders className="h-4 w-4 text-indigo-500" />
+                <span>Settings</span>
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      
       {/* Level & XP Progress Indicator */}
-      <div className="cred-glass p-6 rounded-2xl border border-border-primary space-y-4">
-        <div className="space-y-1.5 select-none">
-          <div className="flex justify-between text-xs font-bold font-poppins text-text-primary">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-yellow-500 fill-yellow-500/20" />
-              <span>Level {profile.level} — <span className="text-neutral-400 font-semibold">{levelTitle}</span></span>
-            </div>
+      <div className="cred-glass p-6 rounded-2xl border border-border-primary select-none flex flex-col md:flex-row items-center gap-6">
+        {/* Left: Shield Icon with Level inside, Title below */}
+        <div className="flex flex-col items-center text-center shrink-0 min-w-[120px]">
+          <div className="relative flex items-center justify-center">
+            <Shield className="h-16 w-16 text-indigo-500 fill-indigo-500/10 stroke-[1.5px]" />
+            <span className="absolute text-xl font-black font-poppins text-text-primary mt-0.5">
+              {profile.level}
+            </span>
+          </div>
+          <span className="text-[10px] font-black font-poppins text-text-primary uppercase tracking-wider mt-2.5 max-w-[140px] leading-tight">
+            {levelTitle}
+          </span>
+        </div>
+
+        {/* Right: XP Details & Progress Bar */}
+        <div className="w-full space-y-2.5 flex-1">
+          <div className="flex justify-between items-end text-[10px] font-black font-poppins uppercase tracking-wider text-text-primary">
+            <span>Level Progress</span>
             <span className="text-neutral-400">
-              {currentXP} XP <span className="text-neutral-550 font-normal">/ {xpNeeded} needed</span>
+              {currentXP} <span className="text-neutral-500 font-bold">/ {xpNeeded} XP</span>
             </span>
           </div>
           
-          <div className="w-full h-2 bg-bg-primary rounded-full border border-border-primary overflow-hidden">
+          <div className="w-full h-3 bg-bg-primary rounded-full border border-border-primary overflow-hidden p-[2px]">
             <div 
               className="h-full bg-text-primary rounded-full transition-all duration-500 ease-out"
               style={{ width: `${xpPercentage}%` }}
             />
           </div>
+          
+          <p className="text-[9px] text-neutral-500 font-extrabold uppercase tracking-wide">
+            {xpNeeded - currentXP > 0 
+              ? `${xpNeeded - currentXP} XP required to unlock Level ${profile.level + 1}` 
+              : 'Max Level Completed'}
+          </p>
         </div>
       </div>
 
@@ -703,8 +802,22 @@ CRITICAL INSTRUCTIONS:
               <Tooltip 
                 contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }}
                 itemStyle={{ color: 'var(--text-color)' }}
-                formatter={(value) => [`${value}%`, 'Consistency']}
+                formatter={(value, _, props) => {
+                  const isWeekend = props?.payload?.isWeekend;
+                  return [`${value}%${isWeekend ? ' (Weekend)' : ''}`, 'Consistency'];
+                }}
               />
+              {trendData.map((d, i) => d.isWeekend ? (
+                <ReferenceArea 
+                  key={`ref-${i}`} 
+                  x1={d.date} 
+                  x2={d.date} 
+                  fill="rgba(245, 158, 11, 0.05)" 
+                  stroke="rgba(245, 158, 11, 0.12)"
+                  strokeWidth={0.5}
+                  strokeDasharray="2 2"
+                />
+              ) : null)}
               <Area 
                 type="monotone" 
                 dataKey="percentage" 
@@ -712,6 +825,24 @@ CRITICAL INSTRUCTIONS:
                 strokeWidth={2}
                 fillOpacity={1} 
                 fill="url(#colorConsistency)" 
+                dot={(props: any) => {
+                  const { cx, cy, payload } = props;
+                  if (payload && payload.isWeekend) {
+                    return (
+                      <circle 
+                        key={props.key || `dot-${cx}-${cy}`}
+                        cx={cx} 
+                        cy={cy} 
+                        r={4.5} 
+                        stroke="#f59e0b" 
+                        strokeWidth={2} 
+                        fill="var(--card-bg)"
+                      />
+                    );
+                  }
+                  return null;
+                }}
+                activeDot={{ r: 5.5, stroke: '#f59e0b', strokeWidth: 2, fill: 'var(--card-bg)' }}
               />
             </AreaChart>
           </ResponsiveContainer>
@@ -854,8 +985,25 @@ CRITICAL INSTRUCTIONS:
             {identityList.map(item => (
               <div key={item.name} className="p-3 border border-border-primary rounded-lg bg-bg-primary/50 space-y-2">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="font-extrabold text-text-primary font-poppins">{item.name}</span>
-                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-card-bg px-2 py-0.5 rounded border border-border-primary">
+                  <div className="flex flex-col gap-1">
+                    <span className="font-extrabold text-text-primary font-poppins">{item.name}</span>
+                    <div className="flex items-center gap-1.5">
+                      {item.trend === 'improving' ? (
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 select-none leading-none shrink-0">
+                          ↑ Improving
+                        </span>
+                      ) : item.trend === 'maintaining' ? (
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 select-none leading-none shrink-0">
+                          → Maintaining
+                        </span>
+                      ) : (
+                        <span className="text-[8px] font-black uppercase tracking-wider bg-neutral-500/10 text-neutral-500 border border-neutral-500/20 px-1.5 py-0.5 rounded flex items-center gap-0.5 select-none leading-none shrink-0">
+                          Starting
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider bg-card-bg px-2 py-0.5 rounded border border-border-primary self-start">
                     Identity Lvl {item.level}
                   </span>
                 </div>

@@ -770,11 +770,10 @@ export const useStore = create<AppState>((set, get) => ({
     const isMinMet = habit.min_version_enabled && newCount >= minVal;
     
     let xpAwarded = 0;
-    if (habit.type === 'single_tick') {
-      if (isCompleted) xpAwarded = habit.xp_reward;
-    } else {
-      // Proportional XP reward for frequency-based habits (e.g. 6/4 results in 1.5x XP)
-      xpAwarded = Math.round((newCount / target) * habit.xp_reward);
+    if (isCompleted) {
+      xpAwarded = 5;
+    } else if (isMinMet) {
+      xpAwarded = 3;
     }
     
     const updatedLog: HabitLog = {
@@ -877,7 +876,7 @@ export const useStore = create<AppState>((set, get) => ({
         is_minimum_version: false,
         is_skipped: true,
         is_justified: false,
-        xp_earned: 0
+        xp_earned: -1
       };
     }
     
@@ -904,7 +903,7 @@ export const useStore = create<AppState>((set, get) => ({
       throw upsertError;
     }
     
-    const xpDelta = 0 - (existingLog ? existingLog.xp_earned : 0);
+    const xpDelta = updatedLog.xp_earned - (existingLog ? existingLog.xp_earned : 0);
     if (xpDelta !== 0) {
       await get().addXP(xpDelta);
     }
@@ -1096,6 +1095,8 @@ export const useStore = create<AppState>((set, get) => ({
       console.error("Error inserting streak freeze:", freezeError);
       throw freezeError;
     }
+
+    await get().addXP(1);
     
     // Recalculate streaks
     const updatedHabits = habits.map(h => {

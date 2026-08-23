@@ -6,7 +6,8 @@ import { Dashboard } from './components/Dashboard';
 import { Analytics } from './components/Analytics';
 import { AchievementsList } from './components/AchievementsList';
 import { Settings } from './components/Settings';
-import { Calendar, BarChart2, Trophy, Loader2, Sliders, Flame, Target } from 'lucide-react';
+import { Vita, VITA_DATA } from './components/Vita';
+import { Calendar, BarChart2, Loader2, Flame, Target, BookOpen } from 'lucide-react';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -19,10 +20,15 @@ function App() {
   // Initialize phase notifications reminders
   useNotifications();
   
-  const [activeTab, setActiveTab] = useState<'habits' | 'growth' | 'analytics' | 'achievements' | 'settings'>('habits');
+  const [activeTab, setActiveTab] = useState<'habits' | 'growth' | 'analytics' | 'achievements' | 'settings' | 'vita'>('habits');
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
     typeof Notification !== 'undefined' ? Notification.permission : 'default'
   );
+  const [randomRule] = useState<{ rule: string; category: string } | null>(() => {
+    const allRules = VITA_DATA.flatMap(c => c.rules.map(r => ({ rule: r, category: c.title })));
+    if (allRules.length === 0) return null;
+    return allRules[Math.floor(Math.random() * allRules.length)];
+  });
 
   useEffect(() => {
     init();
@@ -48,11 +54,21 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary select-none transition-colors">
-        <Loader2 className="h-8 w-8 animate-spin text-text-primary mb-4" />
-        <h2 className="text-sm font-bold font-poppins tracking-widest text-neutral-500 uppercase">
-          Initializing Habit Loop...
-        </h2>
+      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary select-none transition-colors p-6 max-w-md mx-auto text-center space-y-6">
+        <Loader2 className="h-8 w-8 animate-spin text-text-primary" />
+        <div className="space-y-3">
+          <h2 className="text-xs font-black font-poppins tracking-widest text-neutral-555 uppercase">
+            Initializing Habit Loop
+          </h2>
+          {randomRule && (
+            <div className="p-5 rounded-2xl bg-card-bg border border-border-primary/50 text-xs font-semibold leading-relaxed text-text-primary shadow-lg animate-fadeIn">
+              "{randomRule.rule}"
+              <span className="block mt-2 text-[9px] font-black text-neutral-550 uppercase tracking-widest">
+                {randomRule.category}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -83,7 +99,7 @@ function App() {
           </button>
         </div>
       )}
-      <div className="w-full max-w-4xl mx-auto px-4 md:px-6 py-6 space-y-6 flex-1">
+      <div className="w-full max-w-4xl mx-auto px-4 md:px-6 py-6 pb-24 space-y-6 flex-1">
         
         {/* Navigation / Header */}
         <header className="flex justify-between items-center border-b border-border-primary pb-4">
@@ -96,81 +112,78 @@ function App() {
               Atomic <span className="text-neutral-450 dark:text-neutral-400 font-medium">HABITS</span>
             </span>
           </div>
-
-          {/* Navigation & Actions */}
-          <div className="flex items-center gap-3 select-none">
-            <nav className="flex items-center bg-card-bg border border-border-primary rounded-lg p-1">
-              <button
-                onClick={() => setActiveTab('habits')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-poppins transition-all cursor-pointer ${
-                  activeTab === 'habits' 
-                    ? 'bg-btn-primary-bg text-btn-primary-text font-bold' 
-                    : 'text-neutral-500 hover:text-text-primary'
-                }`}
-              >
-                <Calendar className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Routines</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('growth')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-poppins transition-all cursor-pointer ${
-                  activeTab === 'growth' 
-                    ? 'bg-btn-primary-bg text-btn-primary-text font-bold' 
-                    : 'text-neutral-500 hover:text-text-primary'
-                }`}
-              >
-                <Target className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Growth</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('analytics')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-poppins transition-all cursor-pointer ${
-                  activeTab === 'analytics' 
-                    ? 'bg-btn-primary-bg text-btn-primary-text font-bold' 
-                    : 'text-neutral-500 hover:text-text-primary'
-                }`}
-              >
-                <BarChart2 className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Analytics</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('achievements')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-poppins transition-all cursor-pointer ${
-                  activeTab === 'achievements' 
-                    ? 'bg-btn-primary-bg text-btn-primary-text font-bold' 
-                    : 'text-neutral-500 hover:text-text-primary'
-                }`}
-              >
-                <Trophy className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Badges</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('settings')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold font-poppins transition-all cursor-pointer ${
-                  activeTab === 'settings' 
-                    ? 'bg-btn-primary-bg text-btn-primary-text font-bold' 
-                    : 'text-neutral-500 hover:text-text-primary'
-                }`}
-              >
-                <Sliders className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Settings</span>
-              </button>
-            </nav>
-          </div>
         </header>
-
+ 
         {/* Core Workspace Content */}
         <main className="min-h-[60vh]">
           {activeTab === 'habits' && <Dashboard activeTab="habits" />}
           {activeTab === 'growth' && <Dashboard activeTab="growth" />}
-          {activeTab === 'analytics' && <Analytics />}
-          {activeTab === 'achievements' && <AchievementsList />}
-          {activeTab === 'settings' && <Settings />}
+          {activeTab === 'analytics' && <Analytics onNavigate={setActiveTab} />}
+          {activeTab === 'achievements' && <AchievementsList onNavigate={setActiveTab} />}
+          {activeTab === 'settings' && <Settings onNavigate={setActiveTab} />}
+          {activeTab === 'vita' && <Vita />}
         </main>
       </div>
 
+      {/* Bottom Floating Navigation Bar */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm sm:max-w-md select-none">
+        <nav className="flex items-center justify-around bg-card-bg/95 backdrop-blur-md border border-border-primary rounded-2xl p-2.5 shadow-2xl">
+          {/* Growth Button */}
+          <button
+            onClick={() => setActiveTab('growth')}
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'growth' 
+                ? 'text-indigo-500 scale-105' 
+                : 'text-neutral-500 hover:text-text-primary'
+            }`}
+          >
+            <Target className={`h-4.5 w-4.5 ${activeTab === 'growth' ? 'stroke-[3px]' : ''}`} />
+            <span>Growth</span>
+          </button>
+
+          {/* Routines Button */}
+          <button
+            onClick={() => setActiveTab('habits')}
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'habits' 
+                ? 'text-indigo-500 scale-105' 
+                : 'text-neutral-500 hover:text-text-primary'
+            }`}
+          >
+            <Calendar className={`h-4.5 w-4.5 ${activeTab === 'habits' ? 'stroke-[3px]' : ''}`} />
+            <span>Routines</span>
+          </button>
+
+          {/* Analytics Button */}
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings'
+                ? 'text-indigo-500 scale-105' 
+                : 'text-neutral-500 hover:text-text-primary'
+            }`}
+          >
+            <BarChart2 className={`h-4.5 w-4.5 ${activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings' ? 'stroke-[3px]' : ''}`} />
+            <span>Analytics</span>
+          </button>
+
+          {/* Vita Button */}
+          <button
+            onClick={() => setActiveTab('vita')}
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+              activeTab === 'vita' 
+                ? 'text-indigo-500 scale-105' 
+                : 'text-neutral-500 hover:text-text-primary'
+            }`}
+          >
+            <BookOpen className={`h-4.5 w-4.5 ${activeTab === 'vita' ? 'stroke-[3px]' : ''}`} />
+            <span>Vita</span>
+          </button>
+        </nav>
+      </div>
+
       {/* Footer Quote */}
-      <footer className="w-full text-center py-6 border-t border-border-primary select-none">
+      <footer className="w-full text-center py-6 border-t border-border-primary select-none pb-24">
         <p className="text-[10px] text-neutral-600 font-medium max-w-xs mx-auto leading-relaxed">
           "Every action you take is a vote for the type of person you wish to become."
           <span className="block mt-1 font-bold text-neutral-700 font-poppins uppercase tracking-wider">

@@ -7,7 +7,11 @@ import {
 } from 'lucide-react';
 import * as Icons from 'lucide-react';
 
-export const Settings: React.FC = () => {
+export interface SettingsProps {
+  onNavigate?: (tab: 'habits' | 'growth' | 'analytics' | 'achievements' | 'settings') => void;
+}
+
+export const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
   const habits = useStore(state => state.habits);
   const theme = useStore(state => state.theme);
   const toggleTheme = useStore(state => state.toggleTheme);
@@ -98,9 +102,20 @@ export const Settings: React.FC = () => {
   return (
     <div className="space-y-6 font-sans selection:bg-text-primary selection:text-bg-primary transition-colors max-w-2xl mx-auto">
       {/* Title */}
-      <div className="border-b border-border-primary pb-4 select-none">
-        <h2 className="text-xl font-bold font-poppins text-text-primary uppercase tracking-wider">Workspace settings</h2>
-        <p className="text-xs text-neutral-500 mt-1">Configure your identity details, appearance, and manage archived routines</p>
+      <div className="border-b border-border-primary pb-4 flex items-center gap-3">
+        {onNavigate && (
+          <button
+            onClick={() => onNavigate('analytics')}
+            className="p-2 rounded-xl bg-card-bg border border-border-primary text-neutral-505 hover:text-text-primary transition-colors cursor-pointer shrink-0"
+            title="Back to Analytics"
+          >
+            <Icons.ArrowLeft className="h-4 w-4" />
+          </button>
+        )}
+        <div>
+          <h2 className="text-xl font-bold font-poppins text-text-primary uppercase tracking-wider">Workspace settings</h2>
+          <p className="text-xs text-neutral-500 mt-1">Configure your identity details, appearance, and manage archived routines</p>
+        </div>
       </div>
 
       {/* Gamified Profile Identity Card */}

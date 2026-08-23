@@ -2,7 +2,11 @@ import React from 'react';
 import { useStore } from '../store/useStore';
 import * as Icons from 'lucide-react';
 
-export const AchievementsList: React.FC = () => {
+export interface AchievementsListProps {
+  onNavigate?: (tab: 'habits' | 'growth' | 'analytics' | 'achievements' | 'settings') => void;
+}
+
+export const AchievementsList: React.FC<AchievementsListProps> = ({ onNavigate }) => {
   const achievements = useStore(state => state.achievements);
   
   const getIcon = (iconName: string, unlocked: boolean) => {
@@ -22,9 +26,20 @@ export const AchievementsList: React.FC = () => {
     <div className="space-y-6 selection:bg-text-primary selection:text-bg-primary transition-colors">
       {/* Achievements Header Summary */}
       <div className="flex items-center justify-between border-b border-border-primary pb-4">
-        <div>
-          <h2 className="text-xl font-bold font-poppins text-text-primary">Achievements</h2>
-          <p className="text-xs text-neutral-500 mt-1">Unlock badges by staying consistent and building your identities</p>
+        <div className="flex items-center gap-3">
+          {onNavigate && (
+            <button
+              onClick={() => onNavigate('analytics')}
+              className="p-2 rounded-xl bg-card-bg border border-border-primary text-neutral-505 hover:text-text-primary transition-colors cursor-pointer shrink-0"
+              title="Back to Analytics"
+            >
+              <Icons.ArrowLeft className="h-4 w-4" />
+            </button>
+          )}
+          <div>
+            <h2 className="text-xl font-bold font-poppins text-text-primary">Achievements</h2>
+            <p className="text-xs text-neutral-500 mt-1">Unlock badges by staying consistent and building your identities</p>
+          </div>
         </div>
         <div className="text-right">
           <div className="text-2xl font-black text-text-primary font-poppins">
