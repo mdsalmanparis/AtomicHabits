@@ -540,10 +540,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
   }
 
   // Group habits by cue phase (using processedHabits)
-  const habitsByPhase = LIFE_PHASES_META.reduce((acc, phase) => {
-    acc[phase.id] = processedHabits.filter(h => h.cue_phase === phase.id);
-    return acc;
-  }, {} as Record<string, typeof processedHabits>);
+  const habitsByPhase = React.useMemo(() => {
+    return LIFE_PHASES_META.reduce((acc, phase) => {
+      acc[phase.id] = processedHabits.filter(h => h.cue_phase === phase.id);
+      return acc;
+    }, {} as Record<string, typeof processedHabits>);
+  }, [processedHabits]);
+
+  // Auto-select the first phase with habits if the current selected phase is empty
+  useEffect(() => {
+    if (groupBy === 'phase') {
+      const currentHabits = habitsByPhase[selectedPhaseId] || [];
+      if (currentHabits.length === 0) {
+        const firstPhaseWithHabits = LIFE_PHASES_META.find(p => (habitsByPhase[p.id] || []).length > 0);
+        if (firstPhaseWithHabits) {
+          setSelectedPhaseId(firstPhaseWithHabits.id);
+        }
+      }
+    }
+  }, [selectedDate, groupBy, habitsByPhase, selectedPhaseId]);
 
   // Group habits by category (using processedHabits)
   const habitsByCategory = categories.reduce((acc, cat) => {
@@ -794,11 +809,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
         <>
           {/* Top Header Card */}
           <div className="cred-glass p-5 sm:p-6 rounded-2xl border border-border-primary space-y-3.5">
-            {/* Header row: Left: welcome details, Right: Shields */}
+            {/* Header row: Left: welcome details, Right: Shields & Action */}
             <div className="flex justify-between items-start w-full gap-4">
               <div className="space-y-1">
                 <h1 className="text-xl sm:text-2xl font-black font-poppins text-text-primary tracking-tight">
-                  Hola, {profile.display_name}
+                  <span className="text-indigo-600">Hola,</span> {profile.display_name}
                 </h1>
                 <p className="text-[10px] sm:text-xs text-neutral-500 font-semibold select-none flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span>{formatFriendlyDate(selectedDate)} (Ends at 5AM)</span>
@@ -824,10 +839,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
                 </p>
               </div>
 
-              {/* Streak Shields Pill */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-[9px] font-black text-cyan-400 uppercase tracking-wider shrink-0 select-none">
-                <Shield className="h-3.5 w-3.5 fill-cyan-400/20" />
-                <span>Shields: {profile.streak_shields}</span>
+              {/* Right Side Actions: Shields & New Habit */}
+              <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
+                {/* Streak Shields Pill */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-cyan-500/10 border border-cyan-500/20 rounded-xl text-[9px] font-black text-cyan-400 uppercase tracking-wider select-none">
+                  <Shield className="h-3.5 w-3.5 fill-cyan-400/20" />
+                  <span>Shields: {profile.streak_shields}</span>
+                </div>
+                
+                {/* New Habit Button */}
+                <button
+                  onClick={() => {
+                    setEditHabitId(undefined);
+                    setShowHabitForm(true);
+                  }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-xl text-[9px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-wider select-none cursor-pointer transition-colors"
+                >
+                  <Plus className="h-3.5 w-3.5 stroke-[2.5px]" />
+                  <span>New Habit</span>
+                </button>
               </div>
             </div>
 
