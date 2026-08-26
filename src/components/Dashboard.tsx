@@ -4,6 +4,8 @@ import type { QuarterlyGoal } from '../store/useStore';
 import { HabitCard } from './HabitCard';
 import { HabitForm } from './HabitForm';
 import { getLogicalDate, formatFriendlyDate, addDays, calculateHabitStats, isHabitScheduledForDate } from '../utils/dateUtils';
+import { FILTER_OPTIONS, filterHabits } from '../utils/habitFilters';
+import type { HabitFilterType } from '../utils/habitFilters';
 import { 
   Plus, 
   Shield, 
@@ -25,7 +27,6 @@ import {
   CloudRain,
   Frown,
   Meh,
-  Sliders,
   Clock,
   Zap,
   Battery,
@@ -38,6 +39,7 @@ import {
   Edit2,
   Ban,
   Circle,
+  Filter,
   TrendingUp,
   TrendingDown
 } from 'lucide-react';
@@ -62,65 +64,6 @@ const PHASE_ROMAN_NAMES: Record<string, string> = {
   phase_2: 'Phase II',
   phase_3: 'Phase III',
   phase_4: 'Phase IV'
-};
-
-interface CustomDropdownProps {
-  label: string;
-  value: string;
-  options: { value: string; label: string }[];
-  onChange: (val: string) => void;
-  icon?: React.ReactNode;
-}
-
-const CustomDropdown: React.FC<CustomDropdownProps> = ({ label, value, options, onChange, icon }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const activeOption = options.find(o => o.value === value) || options[0];
-
-  return (
-    <div className="relative flex flex-col gap-1 select-none">
-      <span className="text-[8px] font-black uppercase text-neutral-500 dark:text-neutral-400 tracking-wider">
-        {label}
-      </span>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="h-9 px-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-[10px] text-text-primary font-bold flex items-center justify-between gap-2 focus:border-indigo-500 cursor-pointer min-w-[130px] sm:min-w-[140px] shrink-0 hover:border-neutral-400 transition-colors"
-      >
-        <span className="flex items-center gap-1.5">
-          {icon}
-          {activeOption.label}
-        </span>
-        <ChevronDown className={`h-3 w-3 text-neutral-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
-
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 md:left-0 md:right-auto top-full mt-1.5 w-48 bg-white dark:bg-neutral-950 border border-border-primary rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-fadeIn">
-            {options.map(opt => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => {
-                  onChange(opt.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full px-3 py-2 text-[10px] text-left font-bold flex items-center justify-between transition-colors cursor-pointer ${
-                  opt.value === value
-                    ? 'bg-indigo-500/10 text-indigo-500'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-900'
-                }`}
-              >
-                <span>{opt.label}</span>
-                {opt.value === value && <span className="text-indigo-500 text-[10px]">✓</span>}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
 };
 
 interface CustomCalendarPickerProps {
@@ -249,6 +192,58 @@ const CustomCalendarPicker: React.FC<CustomCalendarPickerProps> = ({
   );
 };
 
+interface FilterDropdownProps {
+  value: HabitFilterType;
+  onChange: (val: HabitFilterType) => void;
+}
+
+const FilterDropdown: React.FC<FilterDropdownProps> = ({ value, onChange }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const activeOption = FILTER_OPTIONS.find(o => o.value === value) || FILTER_OPTIONS[0];
+
+  return (
+    <div className="relative select-none z-30">
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="h-9 px-3 bg-neutral-100 dark:bg-neutral-900 border border-border-primary rounded-xl text-[10px] text-text-primary font-bold flex items-center justify-between gap-2 focus:border-indigo-500 hover:border-neutral-400 transition-colors cursor-pointer min-w-[130px] shrink-0"
+      >
+        <span className="flex items-center gap-1.5">
+          <Filter className="h-3.5 w-3.5 text-neutral-500" />
+          {activeOption.label}
+        </span>
+        <ChevronDown className={`h-3 w-3 text-neutral-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+          <div className="absolute right-0 top-full mt-1.5 w-44 bg-white dark:bg-neutral-950 border border-border-primary rounded-xl shadow-xl z-50 py-1 overflow-hidden animate-fadeIn">
+            {FILTER_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full px-3 py-2 text-[10px] text-left font-bold flex items-center justify-between transition-colors cursor-pointer ${
+                  opt.value === value
+                    ? 'bg-indigo-500/10 text-indigo-500'
+                    : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-50 dark:hover:bg-neutral-900'
+                }`}
+              >
+                <span>{opt.label}</span>
+                {opt.value === value && <span className="text-indigo-500 text-[10px]">✓</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', showHabitForm: propsShowHabitForm, setShowHabitForm: propsSetShowHabitForm }) => {
   const profile = useStore(state => state.profile);
   const habits = useStore(state => state.habits);
@@ -298,9 +293,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
   
   const [moodActivePhase, setMoodActivePhase] = useState<'phase_1' | 'phase_2' | 'phase_3' | 'phase_4'>('phase_1');
   const [selectedPhaseId, setSelectedPhaseId] = useState<string>('all_day');
-  const [groupBy, setGroupBy] = useState<'phase' | 'category' | 'flat'>('phase');
-  const [sortBy, setSortBy] = useState<'default' | 'uncompleted' | 'failing' | 'alpha'>('default');
-  const [filterBy, setFilterBy] = useState<'all' | 'uncompleted' | 'completed'>('all');
+  const [phaseDirection, setPhaseDirection] = useState<'left' | 'right'>('right');
+  const [activeFilter, setActiveFilter] = useState<HabitFilterType>('all');
   const [dashboardTab, setDashboardTab] = useState<'checklist' | 'trackers'>('checklist');
   const [growthTab, setGrowthTab] = useState<'planner' | 'milestones' | 'review' | 'roadmap'>('planner');
   const [meditationDuration, setMeditationDuration] = useState(0);
@@ -331,7 +325,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState<Date>(new Date());
 
-  const categories = useStore(state => state.categories) || [];
+
 
 
   const todayLogicalStr = getLogicalDate(new Date(), profile.day_offset_hours);
@@ -408,47 +402,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
 
 
 
-  const getHabitFailureRate = (habitId: string) => {
-    const h = habits.find(hab => hab.id === habitId);
-    if (!h) return 0;
-    const estDate = new Date('2026-08-18T00:00:00');
-    const creationDate = new Date(h.created_at);
-    const startDate = creationDate > estDate ? creationDate : estDate;
-    
-    let activeDaysCount = 0;
-    let missedDaysCount = 0;
-    
-    const current = new Date();
-    current.setDate(current.getDate() - 1); // Exclude today
-    
-    while (true) {
-      const year = current.getFullYear();
-      const month = String(current.getMonth() + 1).padStart(2, '0');
-      const day = String(current.getDate()).padStart(2, '0');
-      const dateStr = `${year}-${month}-${day}`;
-      
-      if (dateStr < getLogicalDate(startDate, profile.day_offset_hours)) break;
-      
-      if (isHabitScheduledForDate(h, dateStr)) {
-        activeDaysCount++;
-        const log = logs.find(l => l.habit_id === h.id && l.logical_date === dateStr);
-        const hasFreeze = freezes.some(f => f.habit_id === h.id && f.logical_date === dateStr);
-        
-        if (log) {
-          const count = Number(log.count_completed);
-          const target = Number(h.target_count);
-          const minVal = h.min_version_enabled ? Number(h.min_version_count) : target;
-          const completed = count >= target || (h.min_version_enabled && count >= minVal);
-          if (!completed && !hasFreeze) missedDaysCount++;
-        } else if (!hasFreeze) {
-          missedDaysCount++;
-        }
-      }
-      current.setDate(current.getDate() - 1);
-    }
-    
-    return activeDaysCount > 0 ? (missedDaysCount / activeDaysCount) * 100 : 0;
-  };
+
 
   const getHabitListMetrics = (habitsList: typeof habits) => {
     let completed = 0;
@@ -502,77 +456,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
     ? scheduledActiveHabits.filter(h => !h.is_salah && !h.name.toLowerCase().includes('water'))
     : scheduledActiveHabits;
 
-  // Filter pipeline
-  let processedHabits = [...normalActiveHabits];
+  const processedHabits = filterHabits(
+    normalActiveHabits,
+    activeFilter,
+    selectedDate,
+    logs,
+    freezes,
+    profile.day_offset_hours
+  );
 
-  if (filterBy === 'uncompleted') {
-    processedHabits = processedHabits.filter(h => {
-      const log = logs.find(l => l.habit_id === h.id && l.logical_date === selectedDate);
-      const completed = log && (log.is_skipped || log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version));
-      return !completed;
-    });
-  } else if (filterBy === 'completed') {
-    processedHabits = processedHabits.filter(h => {
-      const log = logs.find(l => l.habit_id === h.id && l.logical_date === selectedDate);
-      const completed = log && (log.is_skipped || log.count_completed >= h.target_count || (h.min_version_enabled && log.is_minimum_version));
-      return completed;
-    });
-  }
-
-  // Sort pipeline
-  if (sortBy === 'alpha') {
-    processedHabits.sort((a, b) => a.name.localeCompare(b.name));
-  } else if (sortBy === 'uncompleted') {
-    processedHabits.sort((a, b) => {
-      const logA = logs.find(l => l.habit_id === a.id && l.logical_date === selectedDate);
-      const compA = logA && (logA.is_skipped || logA.count_completed >= a.target_count || (a.min_version_enabled && logA.is_minimum_version)) ? 1 : 0;
-      
-      const logB = logs.find(l => l.habit_id === b.id && l.logical_date === selectedDate);
-      const compB = logB && (logB.is_skipped || logB.count_completed >= b.target_count || (b.min_version_enabled && logB.is_minimum_version)) ? 1 : 0;
-      
-      return compA - compB; // uncompleted first
-    });
-  } else if (sortBy === 'failing') {
-    processedHabits.sort((a, b) => getHabitFailureRate(b.id) - getHabitFailureRate(a.id));
-  } else if (sortBy === 'default') {
-    const phaseOrder = { all_day: 0, phase_1: 1, phase_2: 2, phase_3: 3, phase_4: 4 };
-    processedHabits.sort((a, b) => (phaseOrder[a.cue_phase as keyof typeof phaseOrder] || 0) - (phaseOrder[b.cue_phase as keyof typeof phaseOrder] || 0));
-  }
-
-  // Group habits by cue phase (using processedHabits)
-  const habitsByPhase = React.useMemo(() => {
-    return LIFE_PHASES_META.reduce((acc, phase) => {
-      acc[phase.id] = processedHabits.filter(h => h.cue_phase === phase.id);
-      return acc;
-    }, {} as Record<string, typeof processedHabits>);
-  }, [processedHabits]);
+  // Group habits by cue phase
+  const habitsByPhase = LIFE_PHASES_META.reduce((acc, phase) => {
+    acc[phase.id] = processedHabits.filter(h => h.cue_phase === phase.id);
+    return acc;
+  }, {} as Record<string, typeof processedHabits>);
 
   // Auto-select the first phase with habits if the current selected phase is empty
   useEffect(() => {
-    if (groupBy === 'phase') {
-      const currentHabits = habitsByPhase[selectedPhaseId] || [];
-      if (currentHabits.length === 0) {
-        const firstPhaseWithHabits = LIFE_PHASES_META.find(p => (habitsByPhase[p.id] || []).length > 0);
-        if (firstPhaseWithHabits) {
-          setSelectedPhaseId(firstPhaseWithHabits.id);
-        }
+    const byPhase = LIFE_PHASES_META.reduce((acc, phase) => {
+      acc[phase.id] = normalActiveHabits.filter(h => h.cue_phase === phase.id);
+      return acc;
+    }, {} as Record<string, typeof normalActiveHabits>);
+    const currentHabits = byPhase[selectedPhaseId] || [];
+    if (currentHabits.length === 0) {
+      const firstPhaseWithHabits = LIFE_PHASES_META.find(p => (byPhase[p.id] || []).length > 0);
+      if (firstPhaseWithHabits) {
+        setSelectedPhaseId(firstPhaseWithHabits.id);
       }
     }
-  }, [selectedDate, groupBy, habitsByPhase, selectedPhaseId]);
-
-  // Group habits by category (using processedHabits)
-  const habitsByCategory = categories.reduce((acc, cat) => {
-    acc[cat.id] = {
-      name: cat.name,
-      color: cat.color,
-      icon: cat.icon,
-      habits: processedHabits.filter(h => h.category_id === cat.id)
-    };
-    return acc;
-  }, {} as Record<string, { name: string, color: string, icon: string, habits: typeof processedHabits }>);
-
-  // Uncategorized habits
-  const uncategorizedHabits = processedHabits.filter(h => !h.category_id || !categories.some(c => c.id === h.category_id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, selectedPhaseId]);
 
   // Calculate completed out of total active habits for the selectedDate
   const totalCount = scheduledActiveHabits.length;
@@ -981,27 +894,38 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
 
       {/* Dashboard Tab Selector */}
       {activeTab === 'habits' && (
-        <div className="flex border-b border-border-primary/50 gap-4 mb-4 select-none">
-          <button
-            onClick={() => setDashboardTab('checklist')}
-            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
-              dashboardTab === 'checklist'
-                ? 'border-indigo-500 text-indigo-500'
-                : 'border-transparent text-neutral-500 hover:text-neutral-400'
-            }`}
-          >
-            Routines ({processedHabits.length})
-          </button>
-          <button
-            onClick={() => setDashboardTab('trackers')}
-            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
-              dashboardTab === 'trackers'
-                ? 'border-indigo-500 text-indigo-500'
-                : 'border-transparent text-neutral-500 hover:text-neutral-400'
-            }`}
-          >
-            Wellbeing
-          </button>
+        <div className="flex border-b border-border-primary/50 gap-4 mb-4 select-none justify-between items-center">
+          <div className="flex gap-4">
+            <button
+              onClick={() => setDashboardTab('checklist')}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+                dashboardTab === 'checklist'
+                  ? 'border-indigo-500 text-indigo-500'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-400'
+              }`}
+            >
+              Routines ({processedHabits.length})
+            </button>
+            <button
+              onClick={() => setDashboardTab('trackers')}
+              className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+                dashboardTab === 'trackers'
+                  ? 'border-indigo-500 text-indigo-500'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-400'
+              }`}
+            >
+              Wellbeing
+            </button>
+          </div>
+
+          {dashboardTab === 'checklist' && (
+            <div className="pb-2">
+              <FilterDropdown
+                value={activeFilter}
+                onChange={setActiveFilter}
+              />
+            </div>
+          )}
         </div>
       )}
 
@@ -2645,13 +2569,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
       </div>
       </div>
       ) : (
-      <>
-        {/* Checklist Organizer & Phase Selector Toolbar */}
+        <>
+          {/* Checklist Organizer & Phase Selector Toolbar */}
         {scheduledActiveHabits.length > 0 && (
-          <div className="cred-glass p-4 rounded-2xl border border-border-primary flex flex-col lg:flex-row justify-between items-center gap-6 select-none mb-6">
-            {/* Left: Phase Circles (only if Group By is 'phase') */}
-            <div className="flex-1 w-full overflow-x-auto scrollbar-none">
-              {groupBy === 'phase' ? (
+          <div className={`transition-all duration-350 ease-out origin-top overflow-hidden ${
+            activeFilter === 'all' 
+              ? 'max-h-[300px] opacity-100 mb-6 scale-100 pointer-events-auto' 
+              : 'max-h-0 opacity-0 mb-0 scale-95 pointer-events-none'
+          }`}>
+            <div className="cred-glass p-4 rounded-2xl border border-border-primary flex flex-col lg:flex-row justify-between items-center gap-6 select-none">
+              {/* Left: Phase Circles */}
+              <div className="flex-1 w-full overflow-x-auto scrollbar-none">
                 <div className="flex items-center gap-6 justify-start py-1">
                   {LIFE_PHASES_META.map(phase => {
                     const phaseHabits = habitsByPhase[phase.id] || [];
@@ -2672,7 +2600,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
                     return (
                       <button
                         key={phase.id}
-                        onClick={() => setSelectedPhaseId(phase.id)}
+                        onClick={() => {
+                          const allPhaseIds = LIFE_PHASES_META.map(p => p.id);
+                          const currentIdx = allPhaseIds.indexOf(selectedPhaseId);
+                          const nextIdx = allPhaseIds.indexOf(phase.id);
+                          setPhaseDirection(nextIdx > currentIdx ? 'right' : 'left');
+                          setSelectedPhaseId(phase.id);
+                        }}
                         className="flex flex-col items-center gap-2 focus:outline-none group shrink-0 cursor-pointer"
                       >
                         {/* Story Circle representation */}
@@ -2715,8 +2649,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
                           {/* Inner circle phase icon */}
                           <div className={`h-9 w-9 rounded-full flex items-center justify-center border transition-all duration-200 ${
                             isSelected 
-                              ? 'bg-neutral-100 dark:bg-neutral-800 border-indigo-500 scale-105 shadow-sm text-indigo-500' 
-                              : 'bg-card-bg border-border-primary text-neutral-500 group-hover:text-text-primary group-hover:border-border-hover'
+                              ? 'bg-neutral-100 dark:bg-neutral-800 border-indigo-500 scale-105 shadow-sm text-indigo-500 animate-pop' 
+                              : 'bg-card-bg border-border-primary text-neutral-550 group-hover:text-text-primary group-hover:border-border-hover'
                           }`}>
                             <PhaseIcon className="h-4 w-4" />
                           </div>
@@ -2730,7 +2664,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
                             {PHASE_ROMAN_NAMES[phase.id] || phase.name}
                           </span>
                           
-                          <span className="text-[8px] font-extrabold text-neutral-400 dark:text-neutral-500 block mt-0.5 whitespace-nowrap">
+                          <span className="text-[8px] font-extrabold text-neutral-400 dark:text-neutral-555 block mt-0.5 whitespace-nowrap">
                             {metrics.completed}/{total} Done
                           </span>
                         </div>
@@ -2738,380 +2672,163 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
                     );
                   })}
                 </div>
-              ) : (
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-2 rounded-xl bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-indigo-500 shrink-0">
-                      <Sliders className="h-4.5 w-4.5" />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black font-poppins text-text-primary uppercase tracking-wider leading-none">
-                        Checklist Organizer
-                      </h4>
-                      <p className="text-[9px] text-neutral-500 font-semibold tracking-wide uppercase mt-1 leading-none">
-                        Customize checklist sorting & grouping
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <button
-                    onClick={() => setShowHabitForm(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-[9px] font-black uppercase tracking-wider rounded-lg text-text-primary hover:border-neutral-400 transition-colors select-none shrink-0 cursor-pointer"
-                  >
-                    <Plus className="h-3.5 w-3.5 stroke-[2.5px] text-neutral-450 dark:text-neutral-550" />
-                    <span>New Habit</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Right: Filters & dropdowns */}
-            <div className="flex overflow-x-auto scrollbar-none gap-3 w-full lg:w-auto py-0.5 select-none">
-              <CustomDropdown
-                label="Group By"
-                value={groupBy}
-                onChange={(val) => setGroupBy(val as any)}
-                options={[
-                  { value: 'phase', label: 'Circadian Phases' },
-                  { value: 'category', label: 'Habit Categories' },
-                  { value: 'flat', label: 'Consolidated List' }
-                ]}
-              />
-
-              <CustomDropdown
-                label="Sort By"
-                value={sortBy}
-                onChange={(val) => setSortBy(val as any)}
-                options={[
-                  { value: 'default', label: 'Default Phase Wise' },
-                  { value: 'uncompleted', label: 'Uncompleted First' },
-                  { value: 'failing', label: 'Failing First' },
-                  { value: 'alpha', label: 'Alphabetical (A-Z)' }
-                ]}
-              />
-
-              <CustomDropdown
-                label="Filter By"
-                value={filterBy}
-                onChange={(val) => setFilterBy(val as any)}
-                options={[
-                  { value: 'all', label: 'All Habits' },
-                  { value: 'uncompleted', label: 'Uncompleted Only' },
-                  { value: 'completed', label: 'Completed Only' }
-                ]}
-              />
+              </div>
             </div>
           </div>
         )}
+
+
 
       {/* Checklist Sections */}
       <div className="space-y-6">
         {scheduledActiveHabits.length > 0 ? (
-          <>
-            {groupBy === 'phase' && (
-              <div className="flex flex-col gap-6">
-
-                {/* Selected Phase Habits View */}
-                {(() => {
-                  const activePhase = LIFE_PHASES_META.find(p => p.id === selectedPhaseId);
-                  if (!activePhase) return null;
-                  
-                  const phaseHabits = habitsByPhase[activePhase.id] || [];
-                  const metrics = getHabitListMetrics(phaseHabits);
-                  const total = phaseHabits.length;
-                  
-                  return (
-                    <div className="space-y-4 animate-fadeIn">
-                      {/* Phase Info & Detailed Breakdown */}
-                      <div className="cred-glass p-4 rounded-2xl border border-border-primary/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 select-none">
-                        <div>
-                          <h3 className="text-xs font-black font-poppins text-text-primary uppercase tracking-wider">
-                            {PHASE_ROMAN_NAMES[activePhase.id]} - {activePhase.name}
-                          </h3>
-                          <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider mt-0.5">
-                            {activePhase.desc}
-                          </p>
-                        </div>
-                        
-                        {/* Down show like total, out of info custom design */}
-                        <div className="flex flex-wrap items-center gap-1.5 text-[8px] font-black uppercase tracking-wider">
-                          {metrics.completed > 0 && (
-                            <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
-                              {metrics.completed} Completed
-                            </span>
-                          )}
-                          {metrics.skipped > 0 && (
-                            <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-lg">
-                              {metrics.skipped} Skipped
-                            </span>
-                          )}
-                          {metrics.justified > 0 && (
-                            <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-lg">
-                              {metrics.justified} Justified
-                            </span>
-                          )}
-                          {metrics.frozen > 0 && (
-                            <span className="bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded-lg">
-                              {metrics.frozen} Frozen
-                            </span>
-                          )}
-                          {metrics.pending > 0 && (
-                            <span className="bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-neutral-500 px-2 py-0.5 rounded-lg">
-                              {metrics.pending} Pending
-                            </span>
-                          )}
-                          <span className="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded-lg">
-                            {total} {total === 1 ? 'Routine' : 'Routines'} Total
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* Habit Cards Grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {phaseHabits.map(habit => (
-                          <HabitCard 
-                            key={habit.id} 
-                            habit={habit} 
-                            selectedDate={selectedDate} 
-                            onEditClick={() => {
-                              setEditHabitId(habit.id);
-                              setShowHabitForm(true);
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
-            {groupBy === 'category' && (
-              <>
-                {Object.entries(habitsByCategory).map(([catId, catInfo]) => {
-                  if (catInfo.habits.length === 0) return null;
-                  const metrics = getHabitListMetrics(catInfo.habits);
-                  
-                  return (
-                    <div key={catId} className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-border-primary pb-2 select-none">
-                        <div className="flex items-center gap-2.5">
-                          <span className="w-3.5 h-3.5 rounded-lg border border-border-primary flex items-center justify-center shrink-0 font-bold text-[8px]" style={{ backgroundColor: catInfo.color + '20', color: catInfo.color, borderColor: catInfo.color + '40' }}>
-                            📁
-                          </span>
-                          <div>
-                            <h3 className="text-xs font-black tracking-wider text-text-primary uppercase font-poppins leading-none">
-                              {catInfo.name}
-                            </h3>
-                            <p className="text-[9px] text-neutral-500 font-semibold tracking-wider uppercase mt-1 leading-none">
-                              Habit Category Focus
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 select-none">
-                          {metrics.completed > 0 && (
-                            <span className="text-[8px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                              {metrics.completed} done
-                            </span>
-                          )}
-                          {metrics.frozen > 0 && (
-                            <span className="text-[8px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                              {metrics.frozen} frozen
-                            </span>
-                          )}
-                          {metrics.justified > 0 && (
-                            <span className="text-[8px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                              {metrics.justified} excused
-                            </span>
-                          )}
-                          {metrics.pending > 0 && (
-                            <span className="text-[8px] bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-neutral-500 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                              {metrics.pending} left
-                            </span>
-                          )}
-                          <span className="text-[9px] bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded-md border border-border-primary text-neutral-500 font-bold uppercase tracking-wider shrink-0 select-none">
-                            {catInfo.habits.length} {catInfo.habits.length === 1 ? 'routine' : 'routines'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
-                        {catInfo.habits.map(habit => (
-                          <HabitCard 
-                            key={habit.id} 
-                            habit={habit} 
-                            selectedDate={selectedDate} 
-                            onEditClick={() => {
-                              setEditHabitId(habit.id);
-                              setShowHabitForm(true);
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-
-                {uncategorizedHabits.length > 0 && (() => {
-                  const metrics = getHabitListMetrics(uncategorizedHabits);
-                  return (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-border-primary pb-2 select-none">
-                        <div className="flex items-center gap-2.5">
-                          <span className="w-3.5 h-3.5 rounded-lg border border-border-primary bg-neutral-100 dark:bg-neutral-900 text-neutral-500 flex items-center justify-center shrink-0 font-bold text-[8px]">
-                            📁
-                          </span>
-                          <div>
-                            <h3 className="text-xs font-black tracking-wider text-text-primary uppercase font-poppins leading-none">
-                              Uncategorized
-                            </h3>
-                            <p className="text-[9px] text-neutral-500 font-semibold tracking-wider uppercase mt-1 leading-none">
-                              No Category Assigned
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 select-none">
-                          {metrics.completed > 0 && (
-                            <span className="text-[8px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                              {metrics.completed} done
-                            </span>
-                          )}
-                          {metrics.frozen > 0 && (
-                            <span className="text-[8px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                              {metrics.frozen} frozen
-                            </span>
-                          )}
-                          {metrics.justified > 0 && (
-                            <span className="text-[8px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                              {metrics.justified} excused
-                            </span>
-                          )}
-                          {metrics.pending > 0 && (
-                            <span className="text-[8px] bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-neutral-500 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                              {metrics.pending} left
-                            </span>
-                          )}
-                          <span className="text-[9px] bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded-md border border-border-primary text-neutral-500 font-bold uppercase tracking-wider shrink-0 select-none">
-                            {uncategorizedHabits.length} {uncategorizedHabits.length === 1 ? 'routine' : 'routines'}
-                          </span>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
-                        {uncategorizedHabits.map(habit => (
-                          <HabitCard 
-                            key={habit.id} 
-                            habit={habit} 
-                            selectedDate={selectedDate} 
-                            onEditClick={() => {
-                              setEditHabitId(habit.id);
-                              setShowHabitForm(true);
-                            }}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })()}
-              </>
-            )}
-
-            {groupBy === 'flat' && (() => {
-              const metrics = getHabitListMetrics(processedHabits);
-              if (processedHabits.length === 0) return null;
-              return (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-border-primary pb-2 select-none">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-text-primary shrink-0">
-                        <Compass className="h-4 w-4" />
-                      </div>
+          <div className="flex flex-col gap-6">
+            {activeFilter === 'all' ? (
+              /* Selected Phase Habits View */
+              (() => {
+                const activePhase = LIFE_PHASES_META.find(p => p.id === selectedPhaseId);
+                if (!activePhase) return null;
+                
+                const phaseHabits = habitsByPhase[activePhase.id] || [];
+                const metrics = getHabitListMetrics(phaseHabits);
+                const total = phaseHabits.length;
+                
+                return (
+                  <div
+                    key={selectedPhaseId}
+                    className={`space-y-4 ${phaseDirection === 'right' ? 'animate-slideInRight' : 'animate-slideInLeft'}`}
+                  >
+                    {/* Phase Info & Detailed Breakdown */}
+                    <div className="cred-glass p-4 rounded-2xl border border-border-primary/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 select-none">
                       <div>
-                        <h3 className="text-xs font-black tracking-wider text-text-primary uppercase font-poppins leading-none">
-                          Consolidated Checklist
+                        <h3 className="text-xs font-black font-poppins text-text-primary uppercase tracking-wider">
+                          {PHASE_ROMAN_NAMES[activePhase.id]} - {activePhase.name}
                         </h3>
-                        <p className="text-[9px] text-neutral-500 font-semibold tracking-wider uppercase mt-1 leading-none">
-                          All Scheduled Routines
+                        <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider mt-0.5">
+                          {activePhase.desc}
                         </p>
                       </div>
+                      
+                      {/* Down show like total, out of info custom design */}
+                      <div className="flex flex-wrap items-center gap-1.5 text-[8px] font-black uppercase tracking-wider">
+                        {metrics.completed > 0 && (
+                          <span className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
+                            {metrics.completed} Completed
+                          </span>
+                        )}
+                        {metrics.skipped > 0 && (
+                          <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 px-2 py-0.5 rounded-lg">
+                            {metrics.skipped} Skipped
+                          </span>
+                        )}
+                        {metrics.justified > 0 && (
+                          <span className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded-lg">
+                            {metrics.justified} Justified
+                          </span>
+                        )}
+                        {metrics.frozen > 0 && (
+                          <span className="bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded-lg">
+                            {metrics.frozen} Frozen
+                          </span>
+                        )}
+                        {metrics.pending > 0 && (
+                          <span className="bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-neutral-500 px-2 py-0.5 rounded-lg">
+                            {metrics.pending} Pending
+                          </span>
+                        )}
+                        <span className="bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 px-2 py-0.5 rounded-lg">
+                          {total} {total === 1 ? 'Routine' : 'Routines'} Total
+                        </span>
+                      </div>
                     </div>
-
-                    <div className="flex items-center gap-1.5 select-none">
-                      {metrics.completed > 0 && (
-                        <span className="text-[8px] bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                          {metrics.completed} done
-                        </span>
-                      )}
-                      {metrics.frozen > 0 && (
-                        <span className="text-[8px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                          {metrics.frozen} frozen
-                        </span>
-                      )}
-                      {metrics.justified > 0 && (
-                        <span className="text-[8px] bg-purple-500/10 text-purple-400 border border-purple-500/20 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                          {metrics.justified} excused
-                        </span>
-                      )}
-                      {metrics.pending > 0 && (
-                        <span className="text-[8px] bg-neutral-100 dark:bg-neutral-900 border border-border-primary text-neutral-500 px-2 py-0.5 rounded font-black uppercase tracking-wider">
-                          {metrics.pending} left
-                        </span>
-                      )}
-                      <span className="text-[9px] bg-neutral-100 dark:bg-neutral-900 px-2 py-0.5 rounded-md border border-border-primary text-neutral-500 font-bold uppercase tracking-wider shrink-0 select-none">
-                        {processedHabits.length} {processedHabits.length === 1 ? 'routine' : 'routines'}
-                      </span>
+                    
+                    {/* Habit Cards Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {phaseHabits.map(habit => (
+                        <HabitCard 
+                          key={habit.id} 
+                          habit={habit} 
+                          selectedDate={selectedDate} 
+                          onEditClick={() => {
+                            setEditHabitId(habit.id);
+                            setShowHabitForm(true);
+                          }}
+                        />
+                      ))}
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fadeIn">
-                    {processedHabits.map(habit => (
-                      <HabitCard 
-                        key={habit.id} 
-                        habit={habit} 
-                        selectedDate={selectedDate} 
-                        onEditClick={() => {
-                          setEditHabitId(habit.id);
-                          setShowHabitForm(true);
-                        }}
-                      />
-                    ))}
+                );
+              })()
+            ) : (
+              /* Consolidated List View */
+              <div className="space-y-4 animate-fadeIn">
+                {/* Consolidated Header Card */}
+                <div className="cred-glass p-4 rounded-2xl border border-border-primary/60 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 select-none">
+                  <div>
+                    <h3 className="text-xs font-black font-poppins text-text-primary uppercase tracking-wider">
+                      Consolidated List - {FILTER_OPTIONS.find(o => o.value === activeFilter)?.label}
+                    </h3>
+                    <p className="text-[9px] text-neutral-500 font-bold uppercase tracking-wider mt-0.5">
+                      Showing all routines matching this filter across all circadian phases
+                    </p>
                   </div>
+                  <button
+                    onClick={() => setActiveFilter('all')}
+                    className="text-[9px] font-black uppercase text-indigo-500 hover:text-indigo-400 cursor-pointer transition-colors"
+                  >
+                    Clear Filter
+                  </button>
                 </div>
-              );
-            })()}
 
-            {processedHabits.length === 0 && (
-              <div className="cred-glass p-8 text-center rounded-2xl border border-border-primary/50 select-none">
-                <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">No active habits match the selected organize filters</p>
+                {/* Habit Cards Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {processedHabits.map(habit => (
+                    <HabitCard 
+                      key={habit.id} 
+                      habit={habit} 
+                      selectedDate={selectedDate} 
+                      onEditClick={() => {
+                        setEditHabitId(habit.id);
+                        setShowHabitForm(true);
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {processedHabits.length === 0 && (
+                  <div className="cred-glass p-8 text-center rounded-2xl border border-border-primary/50 select-none">
+                    <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">
+                      No active routines match this filter
+                    </p>
+                  </div>
+                )}
               </div>
             )}
-          </>
-        ) : (
-          <div className="text-center py-16 border border-dashed border-border-primary rounded-2xl space-y-4 select-none">
-            <div className="inline-flex p-4 rounded-full bg-card-bg border border-border-primary text-neutral-500">
-              <Plus className="h-8 w-8" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-text-primary font-poppins">No habits active</p>
-              <p className="text-xs text-neutral-500 mt-1 max-w-xs mx-auto">
-                "We are what we repeatedly do. Excellence, then, is not an act, but a habit."
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                setEditHabitId(undefined);
-                setShowHabitForm(true);
-              }}
-              className="px-4 py-2 border border-border-primary text-text-primary rounded-lg text-xs font-semibold hover:border-border-hover cursor-pointer"
-            >
-              Add Your First Habit
-            </button>
           </div>
-        )}
-      </div>
-      </>
+            ) : (
+              <div className="text-center py-16 border border-dashed border-border-primary rounded-2xl space-y-4 select-none">
+                <div className="inline-flex p-4 rounded-full bg-card-bg border border-border-primary text-neutral-500">
+                  <Plus className="h-8 w-8" />
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-text-primary font-poppins">No habits active</p>
+                  <p className="text-xs text-neutral-500 mt-1 max-w-xs mx-auto">
+                    "We are what we repeatedly do. Excellence, then, is not an act, but a habit."
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    setEditHabitId(undefined);
+                    setShowHabitForm(true);
+                  }}
+                  className="px-4 py-2 border border-border-primary text-text-primary rounded-lg text-xs font-semibold hover:border-border-hover cursor-pointer"
+                >
+                  Add Your First Habit
+                </button>
+              </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Habit Create Form Modal */}

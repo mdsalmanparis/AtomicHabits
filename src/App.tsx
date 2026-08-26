@@ -7,7 +7,7 @@ import { Analytics } from './components/Analytics';
 import { AchievementsList } from './components/AchievementsList';
 import { Settings } from './components/Settings';
 import { Vita, VITA_DATA } from './components/Vita';
-import { Calendar, BarChart2, Loader2, Flame, Target, BookOpen } from 'lucide-react';
+import { Calendar, BarChart2, Flame, Target, BookOpen } from 'lucide-react';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -54,21 +54,26 @@ function App() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-center text-text-primary select-none transition-colors p-6 max-w-md mx-auto text-center space-y-6">
-        <Loader2 className="h-8 w-8 animate-spin text-text-primary" />
-        <div className="space-y-3">
-          <h2 className="text-xs font-black font-poppins tracking-widest text-neutral-555 uppercase">
-            Initializing Habit Loop
-          </h2>
-          {randomRule && (
-            <div className="p-5 rounded-2xl bg-card-bg border border-border-primary/50 text-xs font-semibold leading-relaxed text-text-primary shadow-lg animate-fadeIn">
-              "{randomRule.rule}"
-              <span className="block mt-2 text-[9px] font-black text-neutral-550 uppercase tracking-widest">
-                {randomRule.category}
-              </span>
-            </div>
-          )}
+      <div className="min-h-screen bg-bg-primary flex flex-col items-center justify-between text-text-primary select-none transition-colors p-6 max-w-md mx-auto text-center py-20">
+        <div className="flex-1 flex flex-col items-center justify-center space-y-4">
+          <Flame className="h-12 w-12 text-red-500 fill-red-500/20 animate-pulse drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
+          <div className="space-y-1">
+            <h1 className="text-base font-black font-poppins tracking-widest text-text-primary uppercase">
+              Atomic Habits
+            </h1>
+          </div>
         </div>
+
+        {randomRule && (
+          <div className="w-full px-6 py-5 rounded-2xl bg-card-bg/40 border border-border-primary/40 backdrop-blur-sm shadow-xl select-none animate-fadeIn flex flex-col items-center gap-2">
+            <span className="text-[8px] font-black tracking-[0.22em] text-indigo-500 dark:text-indigo-400 uppercase">
+              {randomRule.category}
+            </span>
+            <p className="text-xs font-semibold font-poppins leading-relaxed text-text-primary/90 max-w-[280px]">
+              "{randomRule.rule}"
+            </p>
+          </div>
+        )}
       </div>
     );
   }

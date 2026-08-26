@@ -79,11 +79,15 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   const handleToggleSingle = () => {
     const isDone = activeStatus === 'completed';
 
-    logHabit(
-      habit.id,
-      isDone ? -1 : 1,
-      activeDateStr
-    );
+    if (isDone) {
+      showConfirm(
+        'Undo Completion?',
+        `Are you sure you want to mark "${habit.name}" as incomplete? This will reduce your progress for today.`,
+        () => logHabit(habit.id, -1, activeDateStr)
+      );
+    } else {
+      logHabit(habit.id, 1, activeDateStr);
+    }
   };
 
   const handleToggleMin = (
@@ -123,17 +127,31 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   ) => {
     e.stopPropagation();
 
-    // toggleSkip handles both:
-    // pending -> skipped
-    // skipped -> active/undo
-    toggleSkip(habit.id, activeDateStr);
+    if (isSkipped) {
+      showConfirm(
+        'Undo Skip?',
+        `Are you sure you want to undo the skip for "${habit.name}"? It will be marked as pending again.`,
+        () => toggleSkip(habit.id, activeDateStr)
+      );
+    } else {
+      toggleSkip(habit.id, activeDateStr);
+    }
   };
 
   const handleToggleJustify = (
     e: React.MouseEvent
   ) => {
     e.stopPropagation();
-    toggleJustify(habit.id, activeDateStr);
+
+    if (isJustified) {
+      showConfirm(
+        'Undo Justification?',
+        `Are you sure you want to remove the justification for "${habit.name}"? It will be marked as pending again.`,
+        () => toggleJustify(habit.id, activeDateStr)
+      );
+    } else {
+      toggleJustify(habit.id, activeDateStr);
+    }
   };
 
   const getIcon = (

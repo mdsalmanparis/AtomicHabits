@@ -14,7 +14,10 @@ import {
   AreaChart,
   Area,
   CartesianGrid,
-  ReferenceArea
+  ReferenceArea,
+  ComposedChart,
+  Line,
+  Legend
 } from 'recharts';
 import { Trophy, CircleDot, Flame, RefreshCw, Sparkles, Activity, TrendingUp, Shield } from 'lucide-react';
 import * as Icons from 'lucide-react';
@@ -31,6 +34,8 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onNavigate }) => {
   const logs = useStore(state => state.logs);
   const freezes = useStore(state => state.freezes);
   const profile = useStore(state => state.profile);
+  const sleepLogs = useStore(state => state.sleepLogs) || [];
+  const moodLogs = useStore(state => state.moodLogs) || [];
 
   // Level progress XP percentage
   const currentXP = profile.xp;
@@ -243,6 +248,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onNavigate }) => {
     );
   };
 
+  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<'habits' | 'wellbeing'>('habits');
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -519,7 +525,131 @@ CRITICAL INSTRUCTIONS:
     value: item.votes
   })).filter(p => p.value > 0);
 
+  // --- Wellbeing Analytics Data Calculations ---
+  const waterHabit = habits.find(h => h.name.toLowerCase().includes('water'));
+
+  // 1. Sleep & Energy Correlation Data (Last 14 Days)
+  const sleepEnergyData = last14Days.map(dStr => {
+    const sleepLog = sleepLogs.find(s => s.logical_date === dStr);
+    const moodLog = moodLogs.find(m => m.logical_date === dStr);
+    
+    // Convert energy state to numeric score (1-3)
+    let energyScore = 0;
+    if (moodLog?.energy === 'high') energyScore = 3;
+    else if (moodLog?.energy === 'medium') energyScore = 2;
+    else if (moodLog?.energy === 'low') energyScore = 1;
+    
+    const displayDate = new Date(dStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    
+    return {
+      date: displayDate,
+      sleepHours: sleepLog ? Number(sleepLog.duration_hours) : 0,
+      energy: energyScore,
+      energyLabel: moodLog?.energy ? moodLog.energy.toUpperCase() : 'N/A',
+      mood: moodLog?.mood ? moodLog.mood : 'N/A'
+    };
+  });
+
+  // 2. Hydration Trends vs Target Data (Last 14 Days)
+  const hydrationData = last14Days.map(dStr => {
+    const displayDate = new Date(dStr + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const waterLog = waterHabit ? logs.find(l => l.habit_id === waterHabit.id && l.logical_date === dStr) : null;
+    const actualWater = waterLog ? Number(waterLog.count_completed) : 0;
+    const targetWater = waterHabit ? Number(waterHabit.target_count) : 2.5; // fallback
+    
+    return {
+      date: displayDate,
+      actual: actualWater,
+      target: targetWater
+    };
+  });
+
+  // 3. Mood & Energy Distribution (Last 30 Days)
+  const last30Days = Array.from({ length: 30 }, (_, i) => {
+    return addDays(todayStr, -i);
+  });
+  
+  const moodCounts: Record<string, number> = {
+    happy: 0,
+    okay: 0,
+    hyperactive: 0,
+    sad: 0,
+    depressed: 0
+  };
+
+  moodLogs.forEach(m => {
+    if (last30Days.includes(m.logical_date) && m.mood) {
+      moodCounts[m.mood] = (moodCounts[m.mood] || 0) + 1;
+    }
+  });
+
+  const moodColors: Record<string, string> = {
+    happy: '#10b981',       // Emerald
+    okay: '#6366f1',        // Indigo
+    hyperactive: '#eab308', // Amber
+    sad: '#3b82f6',        // Blue
+    depressed: '#ef4444'    // Red
+  };
+
+  const moodChartData = Object.entries(moodCounts)
+    .filter(([_, count]) => count > 0)
+    .map(([mood, count]) => ({
+      name: mood.toUpperCase(),
+      value: count,
+      color: moodColors[mood] || '#a3a3a3'
+    }));
+
+  const energyCounts: Record<string, number> = {
+    high: 0,
+    medium: 0,
+    low: 0
+  };
+  
+  moodLogs.forEach(m => {
+    if (last30Days.includes(m.logical_date) && m.energy) {
+      energyCounts[m.energy] = (energyCounts[m.energy] || 0) + 1;
+    }
+  });
+
+  const energyColors: Record<string, string> = {
+    high: '#10b981',   // Emerald
+    medium: '#6366f1', // Indigo
+    low: '#ef4444'     // Red
+  };
+
+  const energyChartData = Object.entries(energyCounts)
+    .filter(([_, count]) => count > 0)
+    .map(([energy, count]) => ({
+      name: energy.toUpperCase(),
+      value: count,
+      color: energyColors[energy] || '#a3a3a3'
+    }));
+
+  // Averages calculations for Wellbeing Overview Cards
+  const loggedSleeps = sleepLogs.filter(s => last14Days.includes(s.logical_date));
+  const avgSleep = loggedSleeps.length > 0
+    ? (loggedSleeps.reduce((acc, curr) => acc + Number(curr.duration_hours), 0) / loggedSleeps.length).toFixed(1)
+    : '0.0';
+
+  const loggedMoods = moodLogs.filter(m => last14Days.includes(m.logical_date));
+  const positiveMoodCount = loggedMoods.filter(m => m.mood === 'happy' || m.mood === 'hyperactive' || m.mood === 'okay').length;
+  const moodPositivityRate = loggedMoods.length > 0
+    ? Math.round((positiveMoodCount / loggedMoods.length) * 100)
+    : 0;
+
+  const highEnergyCount = loggedMoods.filter(m => m.energy === 'high').length;
+  const avgEnergyLabel = loggedMoods.length > 0
+    ? highEnergyCount / loggedMoods.length >= 0.5 ? 'HIGH' : loggedMoods.some(m => m.energy === 'medium') ? 'MEDIUM' : 'LOW'
+    : 'N/A';
+
+  const waterLogs = waterHabit ? logs.filter(l => l.habit_id === waterHabit.id && last14Days.includes(l.logical_date)) : [];
+  const avgWater = waterLogs.length > 0
+    ? (waterLogs.reduce((acc, curr) => acc + Number(curr.count_completed), 0) / 14).toFixed(1)
+    : '0.0';
+
   const COLORS = ['var(--btn-primary-bg)', '#a3a3a3', '#525252', 'var(--border-color)', '#d4d4d4', '#171717'];
+
+  const hasWellbeingData = sleepLogs.length > 0 || moodLogs.length > 0 || (waterHabit && logs.some(l => l.habit_id === waterHabit.id));
 
   return (
     <div className="space-y-8 font-sans selection:bg-text-primary selection:text-bg-primary transition-colors">
@@ -600,7 +730,33 @@ CRITICAL INSTRUCTIONS:
         </div>
       </div>
 
-      {/* Top Overview Cards */}
+      {/* Analytics Tab Selector */}
+      <div className="flex border-b border-border-primary/50 gap-4 mb-6 select-none">
+        <button
+          onClick={() => setActiveAnalyticsTab('habits')}
+          className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+            activeAnalyticsTab === 'habits'
+              ? 'border-indigo-500 text-indigo-500'
+              : 'border-transparent text-neutral-500 hover:text-neutral-450'
+          }`}
+        >
+          Habit Metrics
+        </button>
+        <button
+          onClick={() => setActiveAnalyticsTab('wellbeing')}
+          className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+            activeAnalyticsTab === 'wellbeing'
+              ? 'border-indigo-500 text-indigo-500'
+              : 'border-transparent text-neutral-500 hover:text-neutral-450'
+          }`}
+        >
+          Wellbeing Insights
+        </button>
+      </div>
+
+      {activeAnalyticsTab === 'habits' ? (
+        <>
+          {/* Top Overview Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
         {/* Card 1: Consistency Percentage */}
         <div className="cred-card p-5 rounded-xl border border-border-primary bg-card-bg flex flex-col justify-between min-h-[110px]">
@@ -1227,6 +1383,198 @@ CRITICAL INSTRUCTIONS:
         </div>
 
       </div>
-    </div>
-  );
+    </>
+  ) : (
+      /* Wellbeing Insights View */
+      <div className="space-y-6 animate-fadeIn">
+        {!hasWellbeingData ? (
+          <div className="cred-card p-12 text-center rounded-xl border border-border-primary space-y-4 select-none">
+            <div className="inline-flex p-4 rounded-full bg-card-bg border border-border-primary text-neutral-500">
+              <Icons.Activity className="h-8 w-8" />
+            </div>
+            <div className="max-w-xs mx-auto">
+              <h4 className="text-sm font-extrabold text-text-primary uppercase tracking-wider">No Wellbeing Data</h4>
+              <p className="text-xs text-neutral-500 mt-1.5 leading-relaxed">
+                Log sleep, mood, energy, or hydration in the routines page to populate your analyst reports.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 select-none">
+              <div className="cred-card p-5 rounded-xl border border-border-primary bg-card-bg flex flex-col justify-between min-h-[110px]">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] uppercase font-black tracking-widest text-neutral-500 font-poppins">Avg Sleep</span>
+                  <Icons.Bed className="h-4 w-4 text-neutral-500 shrink-0" />
+                </div>
+                <div className="mt-4">
+                  <div className="text-2xl font-black text-text-primary font-poppins tracking-tight leading-none">
+                    {avgSleep} <span className="text-neutral-500 text-xs font-normal">Hrs / Night</span>
+                  </div>
+                  <p className="text-[9px] text-neutral-450 mt-1.5 uppercase font-bold tracking-wider leading-none">Last 14 days average</p>
+                </div>
+              </div>
+
+              <div className="cred-card p-5 rounded-xl border border-border-primary bg-card-bg flex flex-col justify-between min-h-[110px]">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] uppercase font-black tracking-widest text-neutral-500 font-poppins">Mood Positivity</span>
+                  <Icons.Smile className="h-4 w-4 text-neutral-500 shrink-0" />
+                </div>
+                <div className="mt-4">
+                  <div className="text-2xl font-black text-text-primary font-poppins tracking-tight leading-none">
+                    {moodPositivityRate}%
+                  </div>
+                  <p className="text-[9px] text-neutral-450 mt-1.5 uppercase font-bold tracking-wider leading-none">Neutral or Positive days</p>
+                </div>
+              </div>
+
+              <div className="cred-card p-5 rounded-xl border border-border-primary bg-card-bg flex flex-col justify-between min-h-[110px]">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] uppercase font-black tracking-widest text-neutral-500 font-poppins">Avg Energy</span>
+                  <Icons.Zap className="h-4 w-4 text-neutral-500 shrink-0" />
+                </div>
+                <div className="mt-4">
+                  <div className="text-2xl font-black text-text-primary font-poppins tracking-tight leading-none">
+                    {avgEnergyLabel}
+                  </div>
+                  <p className="text-[9px] text-neutral-450 mt-1.5 uppercase font-bold tracking-wider leading-none">Dominant vitality state</p>
+                </div>
+              </div>
+
+              <div className="cred-card p-5 rounded-xl border border-border-primary bg-card-bg flex flex-col justify-between min-h-[110px]">
+                <div className="flex justify-between items-start">
+                  <span className="text-[10px] uppercase font-black tracking-widest text-neutral-500 font-poppins">Avg Hydration</span>
+                  <Icons.Droplet className="h-4 w-4 text-neutral-500 shrink-0" />
+                </div>
+                <div className="mt-4">
+                  <div className="text-2xl font-black text-text-primary font-poppins tracking-tight leading-none">
+                    {avgWater} <span className="text-neutral-500 text-xs font-normal">L / Day</span>
+                  </div>
+                  <p className="text-[9px] text-neutral-450 mt-1.5 uppercase font-bold tracking-wider leading-none">Daily volume logged</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Wellbeing Charts Grid 1 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
+                <div>
+                  <h3 className="text-sm font-extrabold font-poppins text-text-primary">Sleep & Energy Correlation</h3>
+                  <p className="text-[10px] text-neutral-500">Sleep duration (Line) vs Energy score (Bars: 3=High, 2=Med, 1=Low)</p>
+                </div>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={sleepEnergyData} margin={{ top: 10, right: -5, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                      <XAxis dataKey="date" stroke="var(--btn-secondary-border)" fontSize={10} tickLine={false} />
+                      <YAxis yAxisId="left" stroke="var(--btn-secondary-border)" fontSize={10} tickLine={false} domain={[0, 12]} tickFormatter={v => `${v}h`} />
+                      <YAxis yAxisId="right" orientation="right" stroke="var(--btn-secondary-border)" fontSize={10} tickLine={false} domain={[0, 3]} tickFormatter={v => v === 3 ? 'High' : v === 2 ? 'Med' : v === 1 ? 'Low' : ''} />
+                      <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }} />
+                      <Legend wrapperStyle={{ fontSize: '9px', fontWeight: 'bold' }} />
+                      <Bar yAxisId="right" dataKey="energy" fill="var(--btn-primary-bg)" radius={[2, 2, 0, 0]} maxBarSize={20} opacity={0.4} name="Energy Level" />
+                      <Line yAxisId="left" type="monotone" dataKey="sleepHours" stroke="#f43f5e" strokeWidth={2.5} name="Sleep Hours" />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
+                <div>
+                  <h3 className="text-sm font-extrabold font-poppins text-text-primary">Hydration Intake vs Target</h3>
+                  <p className="text-[10px] text-neutral-500">Daily water intake (liters) vs daily target</p>
+                </div>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={hydrationData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                      <XAxis dataKey="date" stroke="var(--btn-secondary-border)" fontSize={10} tickLine={false} />
+                      <YAxis stroke="var(--btn-secondary-border)" fontSize={10} tickLine={false} />
+                      <Tooltip contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-color)', color: 'var(--text-color)' }} />
+                      <Legend wrapperStyle={{ fontSize: '9px', fontWeight: 'bold' }} />
+                      <Area type="monotone" dataKey="actual" stroke="#0ea5e9" fill="rgba(14, 165, 233, 0.15)" strokeWidth={2.5} name="Intake (L)" />
+                      <Line type="monotone" dataKey="target" stroke="#6b7280" strokeDasharray="4 4" dot={false} strokeWidth={1.5} name="Target (L)" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* Wellbeing Charts Grid 2 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
+                <div>
+                  <h3 className="text-sm font-extrabold font-poppins text-text-primary">Mood Distribution (Last 30 Days)</h3>
+                  <p className="text-[10px] text-neutral-500">Frequency of daily mood states</p>
+                </div>
+                {moodChartData.length === 0 ? (
+                  <div className="h-64 flex items-center justify-center text-xs font-bold text-neutral-500 uppercase">No Mood Logs</div>
+                ) : (
+                  <div className="h-64 flex flex-col sm:flex-row items-center justify-center gap-6">
+                    <div className="h-44 w-44">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={moodChartData} cx="50%" cy="50%" innerRadius={55} outerRadius={75} paddingAngle={3} dataKey="value">
+                            {moodChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-1.5">
+                      {moodChartData.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-neutral-600 dark:text-neutral-400">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="uppercase tracking-wider">{item.name}:</span>
+                          <span className="text-text-primary font-black">{item.value} days</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="cred-card p-6 rounded-xl border border-border-primary space-y-4">
+                <div>
+                  <h3 className="text-sm font-extrabold font-poppins text-text-primary">Energy Distribution (Last 30 Days)</h3>
+                  <p className="text-[10px] text-neutral-500">Frequency of daily physical energy states</p>
+                </div>
+                {energyChartData.length === 0 ? (
+                  <div className="h-64 flex items-center justify-center text-xs font-bold text-neutral-500 uppercase">No Energy Logs</div>
+                ) : (
+                  <div className="h-64 flex flex-col sm:flex-row items-center justify-center gap-6">
+                    <div className="h-44 w-44">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={energyChartData} cx="50%" cy="50%" innerRadius={55} outerRadius={75} paddingAngle={3} dataKey="value">
+                            {energyChartData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-1.5">
+                      {energyChartData.map((item, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-neutral-600 dark:text-neutral-400">
+                          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+                          <span className="uppercase tracking-wider">{item.name}:</span>
+                          <span className="text-text-primary font-black">{item.value} days</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    )}
+
+  </div>
+);
 };
