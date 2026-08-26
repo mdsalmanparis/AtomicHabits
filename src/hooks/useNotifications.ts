@@ -2,6 +2,26 @@ import { useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { getLogicalDate, isHabitScheduledForDate } from '../utils/dateUtils';
 
+/**
+ * Robust notification trigger helper using Service Worker showNotification if available,
+ * with standard browser Notification fallback.
+ */
+const showPushNotification = async (title: string, options: NotificationOptions) => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  
+  if ('serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(title, options);
+      return;
+    } catch (e) {
+      console.warn('Service worker not ready for notification, falling back to window Notification:', e);
+    }
+  }
+  
+  new Notification(title, options);
+};
+
 export function useNotifications() {
   const habits = useStore(state => state.habits);
   const logs = useStore(state => state.logs);
@@ -18,10 +38,6 @@ export function useNotifications() {
 
       const now = new Date();
       const hrs = now.getHours();
-      const mins = now.getMinutes();
-
-      // Only evaluate checks on the minute boundaries (e.g. mins === 0 or mins === 30) to save CPU cycle,
-      // but let's check exact hours.
       const todayLogical = getLogicalDate(now, profile.day_offset_hours);
 
       // Phase configuration mapping starts and end-warnings (1 hr before end)
@@ -74,12 +90,12 @@ export function useNotifications() {
 
       phaseTriggers.forEach(trigger => {
         // 1. Check Phase Start Notification
-        if (hrs === trigger.startHour && mins === 0) {
+        if (hrs === trigger.startHour) {
           const storageKey = `last_notified_start_${trigger.phaseId}`;
           const lastSent = localStorage.getItem(storageKey);
 
           if (lastSent !== todayLogical) {
-            new Notification(trigger.startTitle, {
+            showPushNotification(trigger.startTitle, {
               body: trigger.startBody,
               icon: '/favicon.svg'
             });
@@ -88,7 +104,7 @@ export function useNotifications() {
         }
 
         // 2. Check Phase End (1 hr warning) Notification
-        if (hrs === trigger.warningHour && mins === 0) {
+        if (hrs === trigger.warningHour) {
           const storageKey = `last_notified_warning_${trigger.phaseId}`;
           const lastSent = localStorage.getItem(storageKey);
 
@@ -106,7 +122,7 @@ export function useNotifications() {
             });
 
             if (hasIncomplete) {
-              new Notification(trigger.warningTitle, {
+              showPushNotification(trigger.warningTitle, {
                 body: trigger.warningBody,
                 icon: '/favicon.svg'
               });

@@ -84,7 +84,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary font-sans flex flex-col justify-between selection:bg-text-primary selection:text-bg-primary transition-colors">
+    <div className="min-h-screen bg-bg-primary text-text-primary font-sans flex flex-col justify-between selection:bg-text-primary selection:text-bg-primary transition-colors overflow-x-hidden">
       {notificationPermission !== 'granted' && (
         <div className="bg-red-500/10 border-b border-red-500/20 text-red-500 py-3 px-4 text-xs font-bold font-poppins flex flex-col sm:flex-row justify-between items-center gap-2 select-none animate-fadeIn">
           <span>⚠️ Phase Notifications are disabled! You must enable notifications for phase reminders to function.</span>
@@ -132,11 +132,11 @@ function App() {
 
       {/* Bottom Floating Navigation Bar */}
       <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm sm:max-w-md select-none">
-        <nav className="flex items-center justify-around bg-card-bg/95 backdrop-blur-md border border-border-primary rounded-2xl p-2.5 shadow-2xl">
+        <nav className="flex items-center justify-around bg-card-bg/95 backdrop-blur-md border border-border-primary rounded-2xl p-2.5 shadow-2xl touch-manipulation select-none">
           {/* Growth Button */}
           <button
             onClick={() => setActiveTab('growth')}
-            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'growth' 
                 ? 'text-indigo-500 scale-105' 
                 : 'text-neutral-500 hover:text-text-primary'
@@ -149,7 +149,7 @@ function App() {
           {/* Routines Button */}
           <button
             onClick={() => setActiveTab('habits')}
-            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'habits' 
                 ? 'text-indigo-500 scale-105' 
                 : 'text-neutral-500 hover:text-text-primary'
@@ -162,7 +162,7 @@ function App() {
           {/* Analytics Button */}
           <button
             onClick={() => setActiveTab('analytics')}
-            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings'
                 ? 'text-indigo-500 scale-105' 
                 : 'text-neutral-500 hover:text-text-primary'
@@ -175,7 +175,7 @@ function App() {
           {/* Vita Button */}
           <button
             onClick={() => setActiveTab('vita')}
-            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'vita' 
                 ? 'text-indigo-500 scale-105' 
                 : 'text-neutral-500 hover:text-text-primary'

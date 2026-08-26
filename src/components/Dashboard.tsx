@@ -2601,13 +2601,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
                       <button
                         key={phase.id}
                         onClick={() => {
+                          if (selectedPhaseId === phase.id) return;
                           const allPhaseIds = LIFE_PHASES_META.map(p => p.id);
                           const currentIdx = allPhaseIds.indexOf(selectedPhaseId);
                           const nextIdx = allPhaseIds.indexOf(phase.id);
                           setPhaseDirection(nextIdx > currentIdx ? 'right' : 'left');
                           setSelectedPhaseId(phase.id);
                         }}
-                        className="flex flex-col items-center gap-2 focus:outline-none group shrink-0 cursor-pointer"
+                        className="flex flex-col items-center gap-2 focus:outline-none group shrink-0 cursor-pointer touch-manipulation select-none"
                       >
                         {/* Story Circle representation */}
                         <div className="relative flex items-center justify-center h-14 w-14 select-none">
