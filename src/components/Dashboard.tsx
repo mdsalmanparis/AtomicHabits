@@ -2748,18 +2748,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
                       </div>
                     </div>
                     
-                    {/* Habit Cards Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {phaseHabits.map(habit => (
-                        <HabitCard 
-                          key={habit.id} 
-                          habit={habit} 
-                          selectedDate={selectedDate} 
-                          onEditClick={() => {
-                            setEditHabitId(habit.id);
-                            setShowHabitForm(true);
+                    {/* Habit Cards Grid with iOS Mobile Card Stacking */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-4 relative">
+                      {phaseHabits.map((habit, idx) => (
+                        <div 
+                          key={habit.id}
+                          style={{
+                            top: `calc(4rem + ${idx * 0.5}rem)`,
+                            zIndex: 10 + idx,
                           }}
-                        />
+                          className="sticky md:static transition-all duration-300 transform-gpu"
+                        >
+                          <HabitCard 
+                            habit={habit} 
+                            selectedDate={selectedDate} 
+                            onEditClick={() => {
+                              setEditHabitId(habit.id);
+                              setShowHabitForm(true);
+                            }}
+                          />
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -2786,18 +2794,26 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
                   </button>
                 </div>
 
-                {/* Habit Cards Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {processedHabits.map(habit => (
-                    <HabitCard 
-                      key={habit.id} 
-                      habit={habit} 
-                      selectedDate={selectedDate} 
-                      onEditClick={() => {
-                        setEditHabitId(habit.id);
-                        setShowHabitForm(true);
+                {/* Habit Cards Grid with iOS Mobile Card Stacking */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-4 relative">
+                  {processedHabits.map((habit, idx) => (
+                    <div 
+                      key={habit.id}
+                      style={{
+                        top: `calc(4rem + ${idx * 0.5}rem)`,
+                        zIndex: 10 + idx,
                       }}
-                    />
+                      className="sticky md:static transition-all duration-300 transform-gpu"
+                    >
+                      <HabitCard 
+                        habit={habit} 
+                        selectedDate={selectedDate} 
+                        onEditClick={() => {
+                          setEditHabitId(habit.id);
+                          setShowHabitForm(true);
+                        }}
+                      />
+                    </div>
                   ))}
                 </div>
 

@@ -651,6 +651,8 @@ CRITICAL INSTRUCTIONS:
   const COLORS = ['var(--btn-primary-bg)', '#a3a3a3', '#525252', 'var(--border-color)', '#d4d4d4', '#171717'];
 
   const hasWellbeingData = sleepLogs.length > 0 || moodLogs.length > 0 || (waterHabit && logs.some(l => l.habit_id === waterHabit.id));
+  const hasRecoveryItems = habits.some(h => !h.is_archived && getRecoveryData(h)) || 
+                           habits.some(h => isEligibleForRecovery(h, logs, freezes, profile.day_offset_hours));
 
   return (
     <div className="space-y-8 font-sans selection:bg-text-primary selection:text-bg-primary transition-colors">
@@ -753,16 +755,18 @@ CRITICAL INSTRUCTIONS:
         >
           Wellbeing Insights
         </button>
-        <button
-          onClick={() => setActiveAnalyticsTab('improvements')}
-          className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
-            activeAnalyticsTab === 'improvements'
-              ? 'border-indigo-500 text-indigo-500'
-              : 'border-transparent text-neutral-500 hover:text-neutral-450'
-          }`}
-        >
-          Improvements & Recovery
-        </button>
+        {hasRecoveryItems && (
+          <button
+            onClick={() => setActiveAnalyticsTab('improvements')}
+            className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+              activeAnalyticsTab === 'improvements'
+                ? 'border-indigo-500 text-indigo-500'
+                : 'border-transparent text-neutral-500 hover:text-neutral-450'
+            }`}
+          >
+            Improvements & Recovery
+          </button>
+        )}
       </div>
 
       {activeAnalyticsTab === 'habits' ? (

@@ -99,14 +99,14 @@ function App() {
 
       {/* iOS Liquid Glass Capsule Bottom Floating Navigation Bar */}
       <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2.5rem)] max-w-xs sm:max-w-sm select-none">
-        <nav className="flex items-center justify-between bg-neutral-950/80 dark:bg-black/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/15 dark:border-white/10 rounded-full px-3 py-1.5 shadow-[0_12px_32px_0_rgba(0,0,0,0.5)] touch-manipulation select-none">
+        <nav className="flex items-center justify-between bg-white/75 dark:bg-black/75 backdrop-blur-2xl backdrop-saturate-150 border border-black/10 dark:border-white/15 rounded-full px-3 py-1.5 shadow-[0_10px_30px_rgba(0,0,0,0.12)] dark:shadow-[0_12px_32px_0_rgba(0,0,0,0.5)] touch-manipulation select-none transition-colors">
           {/* 1. Routines Button (Left) */}
           <button
             onClick={() => setActiveTab('habits')}
             className={`flex flex-col items-center gap-0.5 py-1 px-4 rounded-full text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'habits' 
-                ? 'text-white bg-white/15 shadow-sm scale-105' 
-                : 'text-neutral-400 hover:text-white'
+                ? 'text-black dark:text-white bg-black/10 dark:bg-white/15 shadow-sm scale-105' 
+                : 'text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white'
             }`}
           >
             <Calendar className={`h-4 w-4 ${activeTab === 'habits' ? 'stroke-[2.5px]' : ''}`} />
@@ -118,8 +118,8 @@ function App() {
             onClick={() => setActiveTab('vita')}
             className={`flex flex-col items-center gap-0.5 py-1 px-4 rounded-full text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'vita' 
-                ? 'text-white bg-white/15 shadow-sm scale-105' 
-                : 'text-neutral-400 hover:text-white'
+                ? 'text-black dark:text-white bg-black/10 dark:bg-white/15 shadow-sm scale-105' 
+                : 'text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white'
             }`}
           >
             <BookOpen className={`h-4 w-4 ${activeTab === 'vita' ? 'stroke-[2.5px]' : ''}`} />
@@ -131,8 +131,8 @@ function App() {
             onClick={() => setActiveTab('analytics')}
             className={`flex flex-col items-center gap-0.5 py-1 px-4 rounded-full text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings'
-                ? 'text-white bg-white/15 shadow-sm scale-105' 
-                : 'text-neutral-400 hover:text-white'
+                ? 'text-black dark:text-white bg-black/10 dark:bg-white/15 shadow-sm scale-105' 
+                : 'text-neutral-500 hover:text-black dark:text-neutral-400 dark:hover:text-white'
             }`}
           >
             <BarChart2 className={`h-4 w-4 ${activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings' ? 'stroke-[2.5px]' : ''}`} />

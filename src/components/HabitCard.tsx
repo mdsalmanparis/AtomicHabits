@@ -292,16 +292,16 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       return (
         <button
           onClick={handleToggleSingle}
-          className={`h-12 w-12 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+          className={`h-12 w-12 rounded-full border flex items-center justify-center transition-all duration-200 cursor-pointer touch-manipulation active:scale-90 ${
             isDone
-              ? 'bg-btn-primary-bg border-btn-primary-bg text-btn-primary-text scale-105 ring-2 ring-emerald-500 ring-offset-2 ring-offset-card-bg shadow-[0_0_12px_rgba(16,185,129,0.2)]'
-              : 'bg-bg-primary border-border-primary text-neutral-500 hover:border-border-hover hover:text-text-primary'
+              ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 scale-105 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
+              : 'bg-bg-primary/80 border-border-primary text-neutral-500 hover:border-emerald-500/40 hover:text-emerald-500'
           }`}
         >
           {isDone ? (
-            <Icons.Check className="h-6 w-6 stroke-[3px]" />
+            <Icons.Check className="h-6 w-6 stroke-[3px] animate-fadeIn" />
           ) : (
-            <Icons.Circle className="h-5 w-5" />
+            <Icons.Circle className="h-5 w-5 stroke-[1.5px]" />
           )}
         </button>
       );
@@ -316,27 +316,27 @@ export const HabitCard: React.FC<HabitCardProps> = ({
     const isCompleted = activeCount >= habit.target_count;
 
     return (
-      <div className="flex items-center gap-3 select-none">
+      <div className="flex items-center gap-2 select-none bg-bg-primary/70 border border-border-primary/60 rounded-full p-1 shadow-inner">
         {/* Decrement */}
         <button
           onClick={handleDecrement}
           disabled={activeCount === 0}
-          className="h-9 w-9 rounded-lg border border-border-primary text-neutral-400 hover:border-border-hover hover:text-text-primary flex items-center justify-center transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+          className="h-8 w-8 rounded-full border border-border-primary/60 text-neutral-400 hover:border-border-hover hover:text-text-primary flex items-center justify-center transition-all disabled:opacity-30 disabled:pointer-events-none cursor-pointer touch-manipulation active:scale-90"
           aria-label="Decrease completion"
         >
-          <Icons.Minus className="h-4 w-4" />
+          <Icons.Minus className="h-3.5 w-3.5" />
         </button>
 
         {/* Progress */}
-        <div className="text-center min-w-[55px]">
-          <div className={`text-sm font-black font-poppins ${isCompleted ? 'text-amber-500' : 'text-text-primary'}`}>
+        <div className="text-center min-w-[48px] px-0.5">
+          <div className={`text-xs font-black font-poppins ${isCompleted ? 'text-emerald-500' : 'text-text-primary'}`}>
             {activeCount}{' '}
-            <span className="text-neutral-500 text-xs font-normal">
+            <span className="text-neutral-500 text-[10px] font-normal">
               / {habit.target_count}
             </span>
           </div>
 
-          <div className={`text-[10px] font-extrabold tracking-wider mt-0.5 ${isCompleted ? 'text-amber-500' : 'text-neutral-500'}`}>
+          <div className={`text-[9px] font-black tracking-wider ${isCompleted ? 'text-emerald-500' : 'text-neutral-500'}`}>
             {pct}%
           </div>
         </div>
@@ -344,10 +344,10 @@ export const HabitCard: React.FC<HabitCardProps> = ({
         {/* Increment */}
         <button
           onClick={handleIncrement}
-          className="h-9 w-9 rounded-lg border border-border-primary text-text-primary bg-card-bg hover:border-border-hover flex items-center justify-center transition-all cursor-pointer"
+          className="h-8 w-8 rounded-full border border-border-primary/60 text-text-primary bg-card-bg hover:border-border-hover flex items-center justify-center transition-all cursor-pointer touch-manipulation active:scale-90"
           aria-label="Increase completion"
         >
-          <Icons.Plus className="h-4 w-4" />
+          <Icons.Plus className="h-3.5 w-3.5" />
         </button>
       </div>
     );
@@ -363,36 +363,33 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
   return (
     <div
-      className={`cred-card rounded-xl overflow-hidden transition-all duration-300 ${
+      className={`cred-card rounded-2xl overflow-hidden transition-all duration-300 border border-border-primary/80 bg-card-bg/60 backdrop-blur-xl shadow-sm hover:shadow-md touch-manipulation select-none ${
         isExpanded
-          ? 'ring-1 ring-border-hover'
+          ? 'ring-1 ring-border-hover/80 shadow-md'
           : ''
       }`}
     >
       {/* Header */}
       <div
-        className="p-5 flex items-center justify-between gap-4 cursor-pointer select-none"
+        className="p-4 sm:p-5 flex items-center justify-between gap-4 cursor-pointer select-none"
         onClick={() =>
           setIsExpanded(!isExpanded)
         }
       >
         {/* Habit Identity */}
-        <div className="space-y-2 flex-1 min-w-0">
-          {/* Category */}
+        <div className="space-y-1.5 flex-1 min-w-0">
+          {/* Category Header */}
           {category && (
-            <div className="flex items-center">
+            <div className="flex items-center mb-1">
               <span
-                className="flex items-center gap-1 px-2 py-0.5 rounded border text-[10px] font-bold tracking-wider uppercase"
+                className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border text-[9px] font-black tracking-wider uppercase shrink-0"
                 style={{
-                  borderColor: `${category.color}30`,
+                  borderColor: `${category.color}35`,
                   color: category.color,
+                  backgroundColor: `${category.color}10`,
                 }}
               >
-                {getIcon(
-                  category.icon,
-                  'h-3 w-3'
-                )}
-
+                {getIcon(category.icon, 'h-3 w-3')}
                 {category.name}
               </span>
             </div>
@@ -573,12 +570,12 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                   isSkipped ||
                   stats.completedToday
                 }
-                className={`flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border transition-all cursor-pointer disabled:opacity-30 disabled:pointer-events-none ${
+                className={`flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border transition-all cursor-pointer touch-manipulation disabled:opacity-30 disabled:pointer-events-none ${
                   stats.completedToday
                     ? 'bg-card-bg border-border-primary text-neutral-500 pointer-events-none'
                     : stats.minCompletedToday
                     ? 'bg-card-bg border-border-hover text-text-primary'
-                    : 'bg-bg-primary border-border-primary text-neutral-500 hover:border-border-hover hover:text-text-primary'
+                    : 'bg-bg-primary/80 border-border-primary text-neutral-500 hover:border-border-hover hover:text-text-primary'
                 }`}
                 title={`Safety net version: ${habit.min_version_description}`}
               >
@@ -591,35 +588,27 @@ export const HabitCard: React.FC<HabitCardProps> = ({
               </button>
             )}
 
-            {/*
-             * IMPORTANT:
-             *
-             * The Skip button is intentionally NOT rendered here.
-             *
-             * There is now only ONE skip UI:
-             * the large Skipped/action button.
-             */}
-             {!isSkipped && !isJustified && (
-               <button
-                 onClick={handleToggleSkip}
-                 className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-border-primary bg-bg-primary text-neutral-500 hover:border-amber-800 hover:text-amber-500 transition-all cursor-pointer"
-                 title="Skip this habit today"
-               >
-                 <Icons.Ban className="h-3.5 w-3" />
-                 <span>Skip</span>
-               </button>
-             )}
+            {!isSkipped && !isJustified && (
+              <button
+                onClick={handleToggleSkip}
+                className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-border-primary/80 bg-bg-primary/80 text-neutral-500 hover:border-amber-700/60 hover:text-amber-500 transition-all cursor-pointer touch-manipulation active:scale-95"
+                title="Skip this habit today"
+              >
+                <Icons.Ban className="h-3 w-3" />
+                <span>Skip</span>
+              </button>
+            )}
 
-             {!isSkipped && !isJustified && (
-               <button
-                 onClick={handleToggleJustify}
-                 className="flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border border-border-primary bg-bg-primary text-neutral-500 hover:border-purple-800 hover:text-purple-500 transition-all cursor-pointer"
-                 title="Justify this habit today"
-               >
-                 <Icons.Scale className="h-3.5 w-3.5" />
-                 <span>Justify</span>
-               </button>
-             )}
+            {!isSkipped && !isJustified && (
+              <button
+                onClick={handleToggleJustify}
+                className="flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border border-border-primary/80 bg-bg-primary/80 text-neutral-500 hover:border-purple-700/60 hover:text-purple-500 transition-all cursor-pointer touch-manipulation active:scale-95"
+                title="Justify this habit today"
+              >
+                <Icons.Scale className="h-3 w-3" />
+                <span>Justify</span>
+              </button>
+            )}
 
             {/* Freeze */}
             {activeStatus === 'missed' &&

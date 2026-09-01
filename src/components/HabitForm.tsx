@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import * as Icons from 'lucide-react';
-import { getRecoveryData } from '../utils/habitFilters';
+import { getRecoveryData, isEligibleForRecovery } from '../utils/habitFilters';
 import type { SubHabit } from '../utils/habitFilters';
 import { getLogicalDate } from '../utils/dateUtils';
 
@@ -37,9 +37,13 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
   const archiveHabit = useStore(state => state.archiveHabit);
   const showConfirm = useStore(state => state.showConfirm);
   const habits = useStore(state => state.habits);
+  const logs = useStore(state => state.logs);
+  const freezes = useStore(state => state.freezes);
   const profile = useStore(state => state.profile);
   
   const editHabit = editHabitId ? habits.find(h => h.id === editHabitId) : undefined;
+  const initialRecovery = editHabit ? getRecoveryData(editHabit) : null;
+  const showRecoveryOption = editHabit ? (!!initialRecovery || isEligibleForRecovery(editHabit, logs, freezes, profile.day_offset_hours)) : false;
   
   // Habit fields
   const [identity, setIdentity] = useState(editHabit?.identity || '');
@@ -52,7 +56,6 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
   const [repeatDays, setRepeatDays] = useState<number[]>(editHabit?.repeat_days || [0, 1, 2, 3, 4, 5, 6]);
   
   // Recovery Mode (Eco Leaf) States
-  const initialRecovery = editHabit ? getRecoveryData(editHabit) : null;
   const [isRecovery, setIsRecovery] = useState(!!initialRecovery);
   const [subHabits, setSubHabits] = useState<SubHabit[]>(initialRecovery?.sub_habits || []);
   const [newSubName, setNewSubName] = useState('');
@@ -520,7 +523,7 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
           </div>
 
           {/* Recovery Mode (Eco Leaf / Light Mode) */}
-          {editHabit && (
+          {showRecoveryOption && (
             <div className="border-t border-border-primary pt-4 space-y-3">
               <div className="flex items-center justify-between">
                 <div>

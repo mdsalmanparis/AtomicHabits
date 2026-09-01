@@ -165,6 +165,7 @@ export function isEligibleForRecovery(
   if (habit.is_archived || habit.is_salah || habit.name.toLowerCase().includes('water')) return false;
   if (getRecoveryData(habit)) return false;
 
+  const creationDateStr = habit.created_at ? habit.created_at.slice(0, 10) : '';
   let consecutiveFails = 0;
   
   const checkDate = new Date();
@@ -176,6 +177,10 @@ export function isEligibleForRecovery(
     const month = String(checkDate.getMonth() + 1).padStart(2, '0');
     const day = String(checkDate.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
+
+    if (creationDateStr && dateStr < creationDateStr) {
+      break;
+    }
 
     if (isHabitScheduledForDate(habit, dateStr)) {
       const log = logs.find(l => l.habit_id === habit.id && l.logical_date === dateStr);
