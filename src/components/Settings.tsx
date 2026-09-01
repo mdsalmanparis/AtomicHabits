@@ -16,6 +16,7 @@ export const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
   const theme = useStore(state => state.theme);
   const toggleTheme = useStore(state => state.toggleTheme);
   const deleteHabitPermanently = useStore(state => state.deleteHabitPermanently);
+  const deleteAllHabits = useStore(state => state.deleteAllHabits);
   const profile = useStore(state => state.profile);
   const updateDisplayName = useStore(state => state.updateDisplayName);
   const logout = useStore(state => state.logout);
@@ -56,6 +57,17 @@ export const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
       `Are you sure you want to PERMANENTLY delete "${name}"? This will delete all history and cannot be undone.`,
       async () => {
         await deleteHabitPermanently(habitId);
+      }
+    );
+  };
+
+  const handleDeleteAllHabits = () => {
+    showConfirm(
+      'Delete ALL Account Habits',
+      '⚠️ DANGER: Are you sure you want to PERMANENTLY delete ALL habits and completion logs for this account? This action CANNOT be undone.',
+      async () => {
+        await deleteAllHabits();
+        alert('All habits and history have been permanently deleted from your account.');
       }
     );
   };
@@ -308,6 +320,28 @@ export const Settings: React.FC<SettingsProps> = ({ onNavigate }) => {
               No archived habits found.
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Danger Zone: Delete All Habits Card */}
+      <div className="cred-card p-6 rounded-xl space-y-4 border-red-900/30 bg-red-950/10">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 select-none">
+          <div className="space-y-0.5">
+            <h3 className="text-sm font-extrabold font-poppins text-red-500 uppercase tracking-wider flex items-center gap-1.5">
+              <Trash2 className="h-4 w-4" />
+              <span>Danger Zone — Delete All Habits</span>
+            </h3>
+            <p className="text-[10px] text-neutral-450 leading-relaxed">
+              Permanently wipe every routine, sub-habit, and completion log associated with this account.
+            </p>
+          </div>
+          <button
+            onClick={handleDeleteAllHabits}
+            className="flex items-center gap-1.5 px-4 py-2 border border-red-600/50 bg-red-600/15 hover:bg-red-600/30 hover:border-red-500 text-red-500 rounded-lg text-xs font-bold transition-all cursor-pointer shrink-0 uppercase tracking-wider"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span>Delete All Habits</span>
+          </button>
         </div>
       </div>
 

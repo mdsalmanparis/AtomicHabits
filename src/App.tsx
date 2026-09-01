@@ -7,7 +7,7 @@ import { Analytics } from './components/Analytics';
 import { AchievementsList } from './components/AchievementsList';
 import { Settings } from './components/Settings';
 import { Vita, VITA_DATA } from './components/Vita';
-import { Calendar, BarChart2, Flame, Target, BookOpen } from 'lucide-react';
+import { Calendar, BarChart2, Flame, BookOpen } from 'lucide-react';
 import { ConfirmDialog } from './components/ConfirmDialog';
 import { useNotifications } from './hooks/useNotifications';
 
@@ -21,9 +21,6 @@ function App() {
   useNotifications();
   
   const [activeTab, setActiveTab] = useState<'habits' | 'growth' | 'analytics' | 'achievements' | 'settings' | 'vita'>('habits');
-  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>(
-    typeof Notification !== 'undefined' ? Notification.permission : 'default'
-  );
   const [randomRule] = useState<{ rule: string; category: string } | null>(() => {
     const allRules = VITA_DATA.flatMap(c => c.rules.map(r => ({ rule: r, category: c.title })));
     if (allRules.length === 0) return null;
@@ -36,16 +33,6 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
-
-    if ('Notification' in window) {
-      if (Notification.permission === 'default') {
-        Notification.requestPermission().then(perm => {
-          setNotificationPermission(perm);
-        });
-      } else {
-        setNotificationPermission(Notification.permission);
-      }
-    }
 
     return () => {
       subscription.unsubscribe();
@@ -85,26 +72,7 @@ function App() {
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary font-sans flex flex-col justify-between selection:bg-text-primary selection:text-bg-primary transition-colors overflow-x-hidden">
-      {notificationPermission !== 'granted' && (
-        <div className="bg-red-500/10 border-b border-red-500/20 text-red-500 py-3 px-4 text-xs font-bold font-poppins flex flex-col sm:flex-row justify-between items-center gap-2 select-none animate-fadeIn">
-          <span>⚠️ Phase Notifications are disabled! You must enable notifications for phase reminders to function.</span>
-          <button
-            onClick={async () => {
-              if ('Notification' in window) {
-                const perm = await Notification.requestPermission();
-                setNotificationPermission(perm);
-                if (perm === 'denied') {
-                  alert("Notifications are blocked in your browser settings. Please click the lock icon in the browser address bar next to the URL and toggle 'Notifications' to 'Allow'.");
-                }
-              }
-            }}
-            className="bg-red-500 text-white font-bold px-3 py-1 rounded hover:bg-red-600 transition-colors cursor-pointer shrink-0 uppercase tracking-wider text-[10px]"
-          >
-            {notificationPermission === 'denied' ? 'How to Unblock' : 'Enable Now'}
-          </button>
-        </div>
-      )}
-      <div className="w-full max-w-4xl mx-auto px-4 md:px-6 py-6 pb-24 space-y-6 flex-1">
+      <div className="w-full max-w-4xl mx-auto px-4 md:px-6 py-6 pb-16 space-y-6 flex-1">
         
         {/* Navigation / Header */}
         <header className="flex justify-between items-center border-b border-border-primary pb-4">
@@ -122,7 +90,6 @@ function App() {
         {/* Core Workspace Content */}
         <main className="min-h-[60vh]">
           {activeTab === 'habits' && <Dashboard activeTab="habits" />}
-          {activeTab === 'growth' && <Dashboard activeTab="growth" />}
           {activeTab === 'analytics' && <Analytics onNavigate={setActiveTab} />}
           {activeTab === 'achievements' && <AchievementsList onNavigate={setActiveTab} />}
           {activeTab === 'settings' && <Settings onNavigate={setActiveTab} />}
@@ -130,59 +97,46 @@ function App() {
         </main>
       </div>
 
-      {/* Bottom Floating Navigation Bar */}
-      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2rem)] max-w-sm sm:max-w-md select-none">
-        <nav className="flex items-center justify-around bg-card-bg/95 backdrop-blur-md border border-border-primary rounded-2xl p-2.5 shadow-2xl touch-manipulation select-none">
-          {/* Growth Button */}
-          <button
-            onClick={() => setActiveTab('growth')}
-            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
-              activeTab === 'growth' 
-                ? 'text-indigo-500 scale-105' 
-                : 'text-neutral-500 hover:text-text-primary'
-            }`}
-          >
-            <Target className={`h-4.5 w-4.5 ${activeTab === 'growth' ? 'stroke-[3px]' : ''}`} />
-            <span>Growth</span>
-          </button>
-
-          {/* Routines Button */}
+      {/* iOS Liquid Glass Capsule Bottom Floating Navigation Bar */}
+      <div className="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 w-[calc(100%-2.5rem)] max-w-xs sm:max-w-sm select-none">
+        <nav className="flex items-center justify-between bg-neutral-950/80 dark:bg-black/80 backdrop-blur-2xl backdrop-saturate-150 border border-white/15 dark:border-white/10 rounded-full px-3 py-1.5 shadow-[0_12px_32px_0_rgba(0,0,0,0.5)] touch-manipulation select-none">
+          {/* 1. Routines Button (Left) */}
           <button
             onClick={() => setActiveTab('habits')}
-            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
+            className={`flex flex-col items-center gap-0.5 py-1 px-4 rounded-full text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'habits' 
-                ? 'text-indigo-500 scale-105' 
-                : 'text-neutral-500 hover:text-text-primary'
+                ? 'text-white bg-white/15 shadow-sm scale-105' 
+                : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <Calendar className={`h-4.5 w-4.5 ${activeTab === 'habits' ? 'stroke-[3px]' : ''}`} />
+            <Calendar className={`h-4 w-4 ${activeTab === 'habits' ? 'stroke-[2.5px]' : ''}`} />
             <span>Routines</span>
           </button>
 
-          {/* Analytics Button */}
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
-              activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings'
-                ? 'text-indigo-500 scale-105' 
-                : 'text-neutral-500 hover:text-text-primary'
-            }`}
-          >
-            <BarChart2 className={`h-4.5 w-4.5 ${activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings' ? 'stroke-[3px]' : ''}`} />
-            <span>Analytics</span>
-          </button>
-
-          {/* Vita Button */}
+          {/* 2. Vita Button (Center) */}
           <button
             onClick={() => setActiveTab('vita')}
-            className={`flex flex-col items-center gap-1 py-1 px-4 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
+            className={`flex flex-col items-center gap-0.5 py-1 px-4 rounded-full text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
               activeTab === 'vita' 
-                ? 'text-indigo-500 scale-105' 
-                : 'text-neutral-500 hover:text-text-primary'
+                ? 'text-white bg-white/15 shadow-sm scale-105' 
+                : 'text-neutral-400 hover:text-white'
             }`}
           >
-            <BookOpen className={`h-4.5 w-4.5 ${activeTab === 'vita' ? 'stroke-[3px]' : ''}`} />
+            <BookOpen className={`h-4 w-4 ${activeTab === 'vita' ? 'stroke-[2.5px]' : ''}`} />
             <span>Vita</span>
+          </button>
+
+          {/* 3. Analytics Button (Right) */}
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex flex-col items-center gap-0.5 py-1 px-4 rounded-full text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer touch-manipulation select-none ${
+              activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings'
+                ? 'text-white bg-white/15 shadow-sm scale-105' 
+                : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <BarChart2 className={`h-4 w-4 ${activeTab === 'analytics' || activeTab === 'achievements' || activeTab === 'settings' ? 'stroke-[2.5px]' : ''}`} />
+            <span>Analytics</span>
           </button>
         </nav>
       </div>

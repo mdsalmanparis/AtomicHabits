@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useStore } from '../store/useStore';
 import * as Icons from 'lucide-react';
+import { getRecoveryData } from '../utils/habitFilters';
+import type { SubHabit } from '../utils/habitFilters';
+import { getLogicalDate } from '../utils/dateUtils';
 
 interface HabitFormProps {
   onClose: () => void;
@@ -34,6 +37,7 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
   const archiveHabit = useStore(state => state.archiveHabit);
   const showConfirm = useStore(state => state.showConfirm);
   const habits = useStore(state => state.habits);
+  const profile = useStore(state => state.profile);
   
   const editHabit = editHabitId ? habits.find(h => h.id === editHabitId) : undefined;
   
@@ -46,6 +50,12 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
   const [targetCount, setTargetCount] = useState(editHabit?.target_count || 1);
   const [cuePhase, setCuePhase] = useState(editHabit?.cue_phase || 'all_day');
   const [repeatDays, setRepeatDays] = useState<number[]>(editHabit?.repeat_days || [0, 1, 2, 3, 4, 5, 6]);
+  
+  // Recovery Mode (Eco Leaf) States
+  const initialRecovery = editHabit ? getRecoveryData(editHabit) : null;
+  const [isRecovery, setIsRecovery] = useState(!!initialRecovery);
+  const [subHabits, setSubHabits] = useState<SubHabit[]>(initialRecovery?.sub_habits || []);
+  const [newSubName, setNewSubName] = useState('');
   
   // Minimum version
   const [minEnabled, setMinEnabled] = useState(editHabit?.min_version_enabled || false);
@@ -78,6 +88,20 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
     }
   };
 
+  const handleAddSubHabit = () => {
+    if (!newSubName.trim()) return;
+    const newSub: SubHabit = {
+      id: Math.random().toString(36).substring(2, 9),
+      name: newSubName.trim()
+    };
+    setSubHabits([...subHabits, newSub]);
+    setNewSubName('');
+  };
+
+  const handleRemoveSubHabit = (id: string) => {
+    setSubHabits(subHabits.filter(s => s.id !== id));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!identity.trim() || !name.trim()) {
@@ -86,21 +110,55 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
     }
 
     try {
-      const data = {
-        identity,
-        name,
-        category_id: categoryId || undefined,
-        icon: habitIcon,
-        type: habitType,
-        target_count: habitType === 'single_tick' ? 1 : targetCount,
-        frequency_unit: 'daily',
-        cue_phase: cuePhase,
-        min_version_enabled: minEnabled,
-        min_version_description: minEnabled ? minDesc : undefined,
-        min_version_count: minEnabled ? minCount : 1,
-        xp_reward: 10,
-        repeat_days: repeatDays
-      };
+      if (isRecovery && subHabits.length === 0) {
+        alert('Please add at least one sub-habit for Recovery Mode.');
+        return;
+      }
+
+      let data: any;
+
+      if (isRecovery) {
+        const recJson = JSON.stringify({
+          is_recovery: true,
+          sub_habits: subHabits,
+          recovery_start_date: initialRecovery?.recovery_start_date || getLogicalDate(new Date(), profile.day_offset_hours),
+          original_target_count: initialRecovery?.original_target_count || editHabit?.target_count || targetCount
+        });
+
+        data = {
+          identity,
+          name,
+          category_id: categoryId || undefined,
+          icon: habitIcon,
+          type: 'frequency',
+          target_count: subHabits.length,
+          frequency_unit: 'daily',
+          cue_phase: cuePhase,
+          min_version_enabled: true,
+          min_version_description: recJson,
+          min_version_count: 1,
+          xp_reward: 10,
+          repeat_days: repeatDays
+        };
+      } else {
+        const restoredTargetCount = initialRecovery ? initialRecovery.original_target_count : targetCount;
+
+        data = {
+          identity,
+          name,
+          category_id: categoryId || undefined,
+          icon: habitIcon,
+          type: habitType,
+          target_count: habitType === 'single_tick' ? 1 : restoredTargetCount,
+          frequency_unit: 'daily',
+          cue_phase: cuePhase,
+          min_version_enabled: minEnabled,
+          min_version_description: minEnabled ? minDesc : undefined,
+          min_version_count: minEnabled ? minCount : 1,
+          xp_reward: 10,
+          repeat_days: repeatDays
+        };
+      }
 
       if (editHabitId) {
         await updateHabit(editHabitId, data);
@@ -120,11 +178,11 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md px-4 py-8 overflow-y-auto">
-      <div className="w-full max-w-lg bg-card-bg border border-border-primary rounded-2xl p-6 md:p-8 space-y-6 my-auto select-none transition-colors">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-2 sm:p-4 overflow-hidden select-none">
+      <div className="w-full max-w-lg max-h-[92vh] sm:max-h-[85vh] bg-card-bg border border-border-primary rounded-2xl flex flex-col shadow-2xl overflow-hidden my-auto transition-all">
         
         {/* Form Header */}
-        <div className="flex justify-between items-center border-b border-border-primary pb-4">
+        <div className="flex justify-between items-center border-b border-border-primary p-4 sm:p-6 shrink-0 bg-card-bg z-10">
           <div>
             <h2 className="text-xl font-bold font-poppins text-text-primary">
               {editHabitId ? 'Edit Habit' : 'Create New Habit'}
@@ -140,7 +198,7 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5 flex flex-col min-h-0">
           {/* Identity Statement */}
           <div>
             <label className="block text-[11px] font-bold text-neutral-400 uppercase tracking-widest mb-1.5">
@@ -461,6 +519,98 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
             </div>
           </div>
 
+          {/* Recovery Mode (Eco Leaf / Light Mode) */}
+          {editHabit && (
+            <div className="border-t border-border-primary pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs font-black text-emerald-500 flex items-center gap-1.5">
+                    <Icons.Leaf className="h-3.5 w-3.5 text-emerald-500 fill-current" />
+                    <span>Recovery Mode</span>
+                  </span>
+                  <span className="text-[10px] text-neutral-505 block mt-0.5 font-bold uppercase tracking-wider">
+                    Reduce this routine to micro-habits to recover from consistent failures
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextVal = !isRecovery;
+                    setIsRecovery(nextVal);
+                    if (nextVal && subHabits.length === 0) {
+                      setSubHabits([{ id: Math.random().toString(36).substring(2, 9), name: `Light: ${name}` }]);
+                    }
+                  }}
+                  className={`w-10 h-6 rounded-full transition-colors relative focus:outline-none ${
+                    isRecovery ? 'bg-emerald-500' : 'bg-card-bg border border-border-primary'
+                  }`}
+                >
+                  <div 
+                    className={`absolute top-1 left-1 w-4 h-4 rounded-full transition-transform ${
+                      isRecovery ? 'bg-black translate-x-4' : 'bg-neutral-500'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {isRecovery && (
+                <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg space-y-3 animate-fadeIn">
+                  <span className="text-[9px] font-black text-emerald-500 uppercase tracking-wider block">
+                    🌿 Define Recovery Sub-Habits
+                  </span>
+                  
+                  {/* List of current sub-habits */}
+                  <div className="space-y-2">
+                    {subHabits.map((sub, sIdx) => (
+                      <div key={sub.id} className="flex items-center justify-between bg-card-bg/60 border border-border-primary/50 rounded-lg px-2.5 py-1.5">
+                        <span className="text-xs font-semibold text-text-primary">
+                          {sIdx + 1}. {sub.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveSubHabit(sub.id)}
+                          className="text-[9px] font-black uppercase text-rose-500 hover:text-rose-400 cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    ))}
+
+                    {subHabits.length === 0 && (
+                      <p className="text-[10px] text-neutral-500 font-semibold uppercase tracking-wider text-center py-2">
+                        No sub-habits added yet. Add at least one!
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Add sub-habit input */}
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newSubName}
+                      onChange={e => setNewSubName(e.target.value)}
+                      placeholder="e.g. 10 squats, write 1 sentence"
+                      className="flex-1 px-3 py-1.5 rounded-md cred-input text-xs"
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddSubHabit();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddSubHabit}
+                      className="bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-500 font-black px-3 rounded-lg text-[9px] uppercase tracking-wider cursor-pointer transition-colors"
+                    >
+                      Add
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Minimum Version (Atomic Habits Two-Minute Rule) */}
           <div className="border-t border-border-primary pt-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -518,8 +668,8 @@ export const HabitForm: React.FC<HabitFormProps> = ({ onClose, editHabitId }) =>
             )}
           </div>
 
-          {/* Form Actions */}
-          <div className="flex flex-col sm:flex-row gap-3 border-t border-border-primary pt-4">
+          {/* Sticky Form Actions Bar pinned to bottom */}
+          <div className="sticky -bottom-4 sm:-bottom-6 left-0 right-0 bg-card-bg/95 backdrop-blur-md pt-3 pb-2 border-t border-border-primary flex flex-col sm:flex-row gap-3 z-30 shrink-0 select-none shadow-[0_-10px_20px_rgba(0,0,0,0.3)]">
             {editHabitId && (
               <button
                 type="button"

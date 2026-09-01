@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import * as Icons from 'lucide-react';
 
 export interface AchievementsListProps {
-  onNavigate?: (tab: 'habits' | 'growth' | 'analytics' | 'achievements' | 'settings') => void;
+  onNavigate?: (tab: 'habits' | 'analytics' | 'achievements' | 'settings' | 'vita') => void;
 }
 
 export const AchievementsList: React.FC<AchievementsListProps> = ({ onNavigate }) => {

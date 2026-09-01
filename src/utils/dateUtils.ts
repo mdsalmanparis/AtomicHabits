@@ -142,13 +142,19 @@ export function calculateHabitStats(
       const target = Number(habit.target_count);
       const minCount = habit.min_version_enabled ? Number(habit.min_version_count) : target;
       
+      const isRecovery = habit.min_version_enabled && habit.min_version_description && habit.min_version_description.trim().startsWith('{"is_recovery"');
+      const completedCount = isRecovery ? Math.floor(count) : count;
+      const isCompleted = isRecovery 
+        ? (completedCount / target >= 0.8) 
+        : count >= target;
+      
       if (log.is_skipped) {
         status = 'skipped';
       } else if (log.is_justified) {
         status = 'justified';
-      } else if (count >= target) {
+      } else if (isCompleted) {
         status = 'completed';
-      } else if (habit.min_version_enabled && count >= minCount) {
+      } else if (habit.min_version_enabled && !isRecovery && count >= minCount) {
         status = 'min_version';
       } else if (hasFreeze) {
         status = 'frozen';
@@ -244,12 +250,15 @@ export function calculateHabitStats(
   const target = habit.target_count;
   const minCount = habit.min_version_enabled ? habit.min_version_count : target;
   
-  const completedToday = todayCount >= target && !(todayLog && todayLog.is_skipped);
-  const minCompletedToday = habit.min_version_enabled && todayCount >= minCount && !(todayLog && todayLog.is_skipped);
+  const isRecovery = habit.min_version_enabled && habit.min_version_description && habit.min_version_description.trim().startsWith('{"is_recovery"');
+  const todaySubCount = isRecovery ? Math.floor(todayCount) : todayCount;
+  const completedToday = (isRecovery ? (todaySubCount / target >= 0.8) : todayCount >= target) && !(todayLog && todayLog.is_skipped);
+  const minCompletedToday = habit.min_version_enabled && !isRecovery && todayCount >= minCount && !(todayLog && todayLog.is_skipped);
   
   const yesterdayLog = logsMap.get(yesterdayStr);
   const yesterdayCount = yesterdayLog ? yesterdayLog.count_completed : 0;
-  const completedYesterday = (yesterdayCount >= target || (habit.min_version_enabled && yesterdayCount >= minCount)) && !(yesterdayLog && yesterdayLog.is_skipped);
+  const yesterdaySubCount = isRecovery ? Math.floor(yesterdayCount) : yesterdayCount;
+  const completedYesterday = (isRecovery ? (yesterdaySubCount / target >= 0.8) : (yesterdayCount >= target || (habit.min_version_enabled && yesterdayCount >= minCount))) && !(yesterdayLog && yesterdayLog.is_skipped);
   
   let statusToday: HabitStats['statusToday'] = 'pending';
   if (!isHabitScheduledForDate(habit, todayStr)) {

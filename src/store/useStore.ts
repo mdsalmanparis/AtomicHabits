@@ -156,6 +156,8 @@ interface AppState {
   tomorrowPlans: TomorrowPlan[];
   plannerPriorities: PlannerPriority[];
   achievements: Achievement[];
+  editHabitId: string | null;
+  showHabitForm: boolean;
   
   theme: 'dark' | 'light';
   toggleTheme: () => void;
@@ -165,6 +167,8 @@ interface AppState {
   setUser: (user: any) => void;
   logout: () => Promise<void>;
   updateDisplayName: (name: string) => Promise<void>;
+  setEditHabitId: (id: string | null) => void;
+  setShowHabitForm: (show: boolean) => void;
   
   // Data Mutators
   addCategory: (name: string, icon: string, color: string) => Promise<Category>;
@@ -172,7 +176,9 @@ interface AppState {
   updateHabit: (habitId: string, habitData: Partial<Omit<Habit, 'id' | 'created_at' | 'streak_count' | 'best_streak' | 'is_archived' | 'user_id'>>) => Promise<void>;
   archiveHabit: (habitId: string) => Promise<void>;
   deleteHabitPermanently: (habitId: string) => Promise<void>;
+  deleteAllHabits: () => Promise<void>;
   logHabit: (habitId: string, countDelta: number, logicalDate?: string) => Promise<void>;
+  logHabitAbsolute: (habitId: string, absoluteCount: number, logicalDate?: string) => Promise<void>;
   toggleSkip: (habitId: string, logicalDate?: string) => Promise<void>;
   toggleJustify: (habitId: string, logicalDate?: string) => Promise<void>;
   buyStreakShield: () => Promise<void>;
@@ -282,6 +288,8 @@ export const useStore = create<AppState>((set, get) => ({
   tomorrowPlans: [],
   plannerPriorities: [],
   achievements: STATIC_ACHIEVEMENTS.map(a => ({ ...a })),
+  editHabitId: null,
+  showHabitForm: false,
   theme: 'dark',
   confirmDialog: {
     isOpen: false,
@@ -322,6 +330,8 @@ export const useStore = create<AppState>((set, get) => ({
       document.documentElement.classList.add('dark');
     }
   },
+  setEditHabitId: (id) => set({ editHabitId: id }),
+  setShowHabitForm: (show) => set({ showHabitForm: show }),
 
   init: async () => {
     if (get().isInitialized) return;
@@ -752,6 +762,23 @@ export const useStore = create<AppState>((set, get) => ({
     set({ habits: updatedHabits, logs: updatedLogs });
   },
 
+  deleteAllHabits: async () => {
+    const { user } = get();
+    if (!user) return;
+
+    await supabase
+      .from('habit_logs')
+      .delete()
+      .eq('user_id', user.id);
+
+    await supabase
+      .from('habits')
+      .delete()
+      .eq('user_id', user.id);
+
+    set({ habits: [], logs: [] });
+  },
+
   logHabit: async (habitId, countDelta, logicalDate) => {
     const { user, logs, habits, profile, freezes } = get();
     if (!user) return;
@@ -768,6 +795,100 @@ export const useStore = create<AppState>((set, get) => ({
     const minVal = habit.min_version_enabled ? habit.min_version_count : target;
     const isCompleted = newCount >= target;
     const isMinMet = habit.min_version_enabled && newCount >= minVal;
+    
+    let xpAwarded = 0;
+    if (isCompleted) {
+      xpAwarded = 5;
+    } else if (isMinMet) {
+      xpAwarded = 3;
+    }
+    
+    const updatedLog: HabitLog = {
+      habit_id: habitId,
+      logical_date: targetDate,
+      count_completed: newCount,
+      is_minimum_version: isMinMet && !isCompleted,
+      is_skipped: false,
+      is_justified: false,
+      xp_earned: xpAwarded
+    };
+    
+    let updatedLogs = [...logs];
+    if (existingLog) {
+      updatedLogs = logs.map(l => l.habit_id === habitId && l.logical_date === targetDate ? updatedLog : l);
+    } else {
+      updatedLogs.push(updatedLog);
+    }
+    
+    set({ logs: updatedLogs });
+
+    const { error: upsertError } = await supabase
+      .from('habit_logs')
+      .upsert({
+        ...updatedLog,
+        user_id: user.id
+      }, {
+        onConflict: 'habit_id,logical_date'
+      });
+    
+    if (upsertError) {
+      console.error("Error saving habit log:", upsertError);
+      throw upsertError;
+    }
+    
+    // Adjust XP
+    const xpDelta = xpAwarded - (existingLog ? existingLog.xp_earned : 0);
+    if (xpDelta !== 0) {
+      await get().addXP(xpDelta);
+    }
+    
+    // Recalculate streak values
+    const updatedHabits = get().habits.map(h => {
+      if (h.id === habitId) {
+        const stats = calculateHabitStats(h, updatedLogs, freezes, profile.day_offset_hours);
+        return {
+          ...h,
+          streak_count: stats.currentStreak,
+          best_streak: stats.bestStreak
+        };
+      }
+      return h;
+    });
+    
+    set({ habits: updatedHabits });
+
+    const updatedH = updatedHabits.find(h => h.id === habitId);
+    if (updatedH) {
+      await supabase
+        .from('habits')
+        .update({
+          streak_count: updatedH.streak_count,
+          best_streak: updatedH.best_streak
+        })
+        .eq('id', habitId);
+    }
+    
+    // Evaluate achievements
+    get().checkAchievements();
+  },
+
+  logHabitAbsolute: async (habitId, absoluteCount, logicalDate) => {
+    const { user, logs, habits, profile, freezes } = get();
+    if (!user) return;
+
+    const targetDate = logicalDate || getLogicalDate(new Date(), profile.day_offset_hours);
+    
+    const habit = habits.find(h => h.id === habitId);
+    if (!habit) return;
+    
+    const existingLog = logs.find(l => l.habit_id === habitId && l.logical_date === targetDate);
+    const newCount = Math.max(0, absoluteCount);
+    
+    const target = habit.target_count;
+    const minVal = habit.min_version_enabled ? habit.min_version_count : target;
+    const integerCount = Math.floor(newCount);
+    const isCompleted = integerCount >= target;
+    const isMinMet = habit.min_version_enabled && integerCount >= minVal;
     
     let xpAwarded = 0;
     if (isCompleted) {

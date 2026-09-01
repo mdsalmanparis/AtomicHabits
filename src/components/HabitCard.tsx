@@ -8,6 +8,13 @@ import {
   getDatesRange,
 } from '../utils/dateUtils';
 import * as Icons from 'lucide-react';
+import { 
+  getRecoveryData, 
+  decodeSubHabitCompletions, 
+  encodeSubHabitCompletions, 
+  getRecoveryStats,
+  isEligibleForRecovery 
+} from '../utils/habitFilters';
 
 interface HabitCardProps {
   habit: Habit;
@@ -21,6 +28,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   onEditClick,
 }) => {
   const logHabit = useStore((state) => state.logHabit);
+  const logHabitAbsolute = useStore((state) => state.logHabitAbsolute);
   const toggleSkip = useStore((state) => state.toggleSkip);
   const toggleJustify = useStore((state) => state.toggleJustify);
   const profile = useStore((state) => state.profile);
@@ -55,6 +63,25 @@ export const HabitCard: React.FC<HabitCardProps> = ({
   );
 
   const activeCount = activeLog?.count_completed ?? 0;
+
+  const recoveryData = getRecoveryData(habit);
+  const isFailingForRecovery = isEligibleForRecovery(habit, logs, freezes, profile.day_offset_hours);
+  const recoveryStats = recoveryData ? getRecoveryStats(habit, logs, freezes, profile.day_offset_hours) : null;
+
+  const handleToggleSubHabit = async (subIndex: number) => {
+    const currentVal = activeLog?.count_completed ?? 0;
+    const { completedIndices } = decodeSubHabitCompletions(currentVal);
+    
+    let newIndices: number[];
+    if (completedIndices.includes(subIndex)) {
+      newIndices = completedIndices.filter(idx => idx !== subIndex);
+    } else {
+      newIndices = [...completedIndices, subIndex];
+    }
+    
+    const encodedVal = encodeSubHabitCompletions(newIndices);
+    await logHabitAbsolute(habit.id, encodedVal, activeDateStr);
+  };
 
   const activeStatus =
     stats.history[activeDateStr]?.status || 'pending';
@@ -221,6 +248,43 @@ export const HabitCard: React.FC<HabitCardProps> = ({
       );
     }
 
+    if (recoveryData) {
+      const { completedIndices } = decodeSubHabitCompletions(activeLog?.count_completed || 0);
+      const isDone = completedIndices.length >= habit.target_count || (completedIndices.length / habit.target_count >= 0.8);
+      
+      const handleToggleAll = async () => {
+        if (isDone) {
+          // Uncheck all subhabits
+          await logHabitAbsolute(habit.id, 0, activeDateStr);
+        } else {
+          // Complete all subhabits
+          const allIndices = recoveryData.sub_habits.map((_, i) => i);
+          const encoded = encodeSubHabitCompletions(allIndices);
+          await logHabitAbsolute(habit.id, encoded, activeDateStr);
+        }
+      };
+
+      return (
+        <div className="flex flex-col items-center justify-center gap-0.5 text-center select-none pr-1">
+          <button
+            type="button"
+            onClick={handleToggleAll}
+            title={isDone ? "Click to reset recovery habit" : "Click to mark recovery habit completed"}
+            className={`h-11 w-11 rounded-full border flex items-center justify-center transition-all cursor-pointer ${
+              isDone 
+                ? 'bg-emerald-500/10 border-emerald-500 text-emerald-500 scale-105 shadow-[0_0_10px_rgba(16,185,129,0.15)]' 
+                : 'bg-bg-primary border-border-primary text-neutral-500 hover:border-emerald-500/30'
+            }`}
+          >
+            <Icons.Leaf className={`h-5 w-5 ${isDone ? 'fill-current' : ''}`} />
+          </button>
+          <span className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mt-1">
+            {completedIndices.length} / {habit.target_count}
+          </span>
+        </div>
+      );
+    }
+
     if (habit.type === 'single_tick') {
       const isDone =
         activeStatus === 'completed';
@@ -342,7 +406,18 @@ export const HabitCard: React.FC<HabitCardProps> = ({
 
             <h3 className="text-base font-extrabold tracking-tight text-text-primary mt-0.5 font-poppins truncate flex items-center gap-1.5">
               {habit.name}
-
+              {recoveryData && (
+                <span className="text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0">
+                  <Icons.Leaf className="h-3 w-3 fill-current text-emerald-500" />
+                  Recovery
+                </span>
+              )}
+              {isFailingForRecovery && (
+                <span className="text-amber-500 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider flex items-center gap-1 shrink-0 animate-pulse">
+                  <Icons.RotateCcw className="h-3 w-3 text-amber-500" />
+                  Recover
+                </span>
+              )}
               <Icons.ChevronDown
                 className={`h-4 w-4 text-neutral-600 shrink-0 transition-transform ${
                   isExpanded
@@ -351,23 +426,102 @@ export const HabitCard: React.FC<HabitCardProps> = ({
                 }`}
               />
             </h3>
+
+            {recoveryData && (
+              <div className="space-y-2 mt-2 bg-emerald-500/[0.02] dark:bg-emerald-500/[0.01] border border-emerald-500/10 rounded-xl p-3" onClick={e => e.stopPropagation()}>
+                <div className="space-y-1.5">
+                  {recoveryData.sub_habits.map((sub, idx) => {
+                    const { completedIndices } = decodeSubHabitCompletions(activeCount);
+                    const isChecked = completedIndices.includes(idx);
+                    const isDisabled = isSkipped || isJustified || activeStatus === 'frozen';
+                    return (
+                      <div 
+                        key={sub.id} 
+                        onClick={() => !isDisabled && handleToggleSubHabit(idx)}
+                        className={`flex items-center gap-2.5 text-xs font-semibold py-1 px-1.5 rounded-md transition-colors cursor-pointer select-none ${
+                          isDisabled ? 'opacity-40 cursor-not-allowed' : 'hover:bg-emerald-500/10'
+                        }`}
+                      >
+                        <div className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors ${isChecked ? 'bg-neutral-500' : 'bg-emerald-500'}`} />
+                        <span className={isChecked ? 'line-through text-neutral-500 font-medium decoration-[1.5px]' : 'text-text-primary'}>
+                          {sub.name}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                {recoveryStats && (
+                  <div className="text-[9px] font-black uppercase tracking-wider text-emerald-500 mt-2 border-t border-emerald-500/10 pt-2 flex items-center gap-1">
+                    <Icons.Flame className="h-3 w-3 fill-current text-emerald-500" />
+                    <span>Streak: {recoveryStats.currentStreak}d</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isFailingForRecovery && (
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const setEdit = useStore.getState().setEditHabitId;
+                  const setShow = useStore.getState().setShowHabitForm;
+                  setEdit(habit.id);
+                  setShow(true);
+                }}
+                className="mt-2.5 p-2.5 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/10 text-amber-505 rounded-xl flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-wider cursor-pointer transition-colors text-amber-500"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Icons.RotateCcw className="h-3.5 w-3.5" />
+                  Consistent Fails. Simplify Routine?
+                </span>
+                <span className="bg-amber-500 text-black px-2 py-0.5 rounded text-[8px] tracking-normal font-black uppercase">Configure</span>
+              </div>
+            )}
+
+            {recoveryStats && recoveryStats.currentStreak >= 7 && (
+              <div 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const setEdit = useStore.getState().setEditHabitId;
+                  const setShow = useStore.getState().setShowHabitForm;
+                  setEdit(habit.id);
+                  setShow(true);
+                }}
+                className="mt-2.5 p-2.5 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 text-emerald-505 rounded-xl flex items-center justify-between gap-2 text-[9px] font-black uppercase tracking-wider cursor-pointer transition-all animate-pulse text-emerald-500"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Icons.TrendingUp className="h-3.5 w-3.5 animate-bounce" />
+                  7-Day Recovery Met! Upgrade now?
+                </span>
+                <span className="bg-emerald-500 text-black px-2 py-0.5 rounded text-[8px] tracking-normal font-black uppercase">Upgrade</span>
+              </div>
+            )}
           </div>
 
           {/* Visual Progress Bar for Frequency Habits */}
-          {habit.type === 'frequency' && (
-            <div className="w-full h-1 bg-neutral-200 dark:bg-neutral-850 rounded-full mt-2.5 overflow-hidden border border-border-primary/20 shrink-0 select-none">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ease-out ${
-                  activeCount > habit.target_count
-                    ? 'bg-gradient-to-r from-amber-400 to-amber-600 animate-pulse'
-                    : activeCount === habit.target_count
-                    ? 'bg-amber-400'
-                    : 'bg-text-primary opacity-60'
-                }`}
-                style={{ width: `${Math.min(100, (activeCount / habit.target_count) * 100)}%` }}
-              />
-            </div>
-          )}
+          {habit.type === 'frequency' && (() => {
+            const completedSubCount = recoveryData 
+              ? decodeSubHabitCompletions(activeCount).completedIndices.length
+              : activeCount;
+            const pctVal = Math.min(100, (completedSubCount / habit.target_count) * 100);
+            
+            return (
+              <div className="w-full h-1 bg-neutral-200 dark:bg-neutral-850 rounded-full mt-2.5 overflow-hidden border border-border-primary/20 shrink-0 select-none">
+                <div 
+                  className={`h-full rounded-full transition-all duration-500 ease-out ${
+                    recoveryData
+                      ? (completedSubCount >= habit.target_count ? 'bg-emerald-500' : 'bg-emerald-500/60')
+                      : (activeCount > habit.target_count
+                          ? 'bg-gradient-to-r from-amber-400 to-amber-600 animate-pulse'
+                          : activeCount === habit.target_count
+                          ? 'bg-amber-400'
+                          : 'bg-text-primary opacity-60')
+                  }`}
+                  style={{ width: `${pctVal}%` }}
+                />
+              </div>
+            );
+          })()}
 
           {/* Habit Info */}
           <div className="flex flex-wrap items-center gap-3 pt-1">
@@ -412,7 +566,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             </div>
 
             {/* Minimum Version */}
-            {habit.min_version_enabled && (
+            {habit.min_version_enabled && !recoveryData && (
               <button
                 onClick={handleToggleMin}
                 disabled={
@@ -808,6 +962,7 @@ export const HabitCard: React.FC<HabitCardProps> = ({
             <div>
               {onEditClick && (
                 <button
+                  data-edit-id={habit.id}
                   onClick={(e) => {
                     e.stopPropagation();
                     onEditClick();

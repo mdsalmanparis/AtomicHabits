@@ -106,3 +106,186 @@ export function filterHabits(
     return true;
   });
 }
+
+export interface SubHabit {
+  id: string;
+  name: string;
+}
+
+export interface RecoveryData {
+  is_recovery: boolean;
+  sub_habits: SubHabit[];
+  recovery_start_date: string;
+  original_target_count: number;
+}
+
+export function getRecoveryData(habit: Habit): RecoveryData | null {
+  if (!habit.min_version_enabled || !habit.min_version_description) return null;
+  const desc = habit.min_version_description.trim();
+  if (desc.startsWith('{') && desc.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(desc);
+      if (parsed && parsed.is_recovery) {
+        return parsed as RecoveryData;
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+  return null;
+}
+
+export function encodeSubHabitCompletions(completedIndices: number[]): number {
+  const count = completedIndices.length;
+  let bitmask = 0;
+  completedIndices.forEach(idx => {
+    bitmask += Math.pow(2, idx);
+  });
+  return count + (bitmask / 1000);
+}
+
+export function decodeSubHabitCompletions(countCompleted: number): { count: number; completedIndices: number[] } {
+  const count = Math.floor(countCompleted);
+  const bitmask = Math.round((countCompleted - count) * 1000);
+  const completedIndices: number[] = [];
+  for (let i = 0; i < 10; i++) {
+    if ((bitmask & (1 << i)) !== 0) {
+      completedIndices.push(i);
+    }
+  }
+  return { count, completedIndices };
+}
+
+export function isEligibleForRecovery(
+  habit: Habit,
+  logs: HabitLog[],
+  freezes: StreakFreeze[],
+  _dayOffsetHours: number
+): boolean {
+  if (habit.is_archived || habit.is_salah || habit.name.toLowerCase().includes('water')) return false;
+  if (getRecoveryData(habit)) return false;
+
+  let consecutiveFails = 0;
+  
+  const checkDate = new Date();
+  checkDate.setDate(checkDate.getDate() - 1);
+  let daysChecked = 0;
+
+  while (daysChecked < 30 && consecutiveFails < 3) {
+    const year = checkDate.getFullYear();
+    const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+    const day = String(checkDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    if (isHabitScheduledForDate(habit, dateStr)) {
+      const log = logs.find(l => l.habit_id === habit.id && l.logical_date === dateStr);
+      const hasFreeze = freezes.some(f => f.habit_id === habit.id && f.logical_date === dateStr);
+
+      if (!hasFreeze) {
+        const isCompleted = log && (
+          log.count_completed >= habit.target_count || 
+          (habit.min_version_enabled && log.is_minimum_version)
+        );
+        if (!isCompleted) {
+          consecutiveFails++;
+        } else {
+          break;
+        }
+      }
+    }
+    checkDate.setDate(checkDate.getDate() - 1);
+    daysChecked++;
+  }
+
+  return consecutiveFails >= 3;
+}
+
+export function getRecoveryStats(
+  habit: Habit,
+  logs: HabitLog[],
+  freezes: StreakFreeze[],
+  dayOffsetHours: number
+) {
+  const recData = getRecoveryData(habit);
+  if (!recData) return null;
+
+  const startDateStr = recData.recovery_start_date;
+  const todayLogical = getLogicalDate(new Date(), dayOffsetHours);
+
+  let beforeScheduledDays = 0;
+  let beforeCompletedDays = 0;
+  
+  let checkDate = new Date(startDateStr + 'T00:00:00');
+  checkDate.setDate(checkDate.getDate() - 1);
+  let daysChecked = 0;
+
+  while (daysChecked < 60 && beforeScheduledDays < 14) {
+    const year = checkDate.getFullYear();
+    const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+    const day = String(checkDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    if (isHabitScheduledForDate(habit, dateStr)) {
+      beforeScheduledDays++;
+      const log = logs.find(l => l.habit_id === habit.id && l.logical_date === dateStr);
+      const hasFreeze = freezes.some(f => f.habit_id === habit.id && f.logical_date === dateStr);
+      if (!hasFreeze && log) {
+        const isCompleted = log.count_completed >= recData.original_target_count || log.is_minimum_version;
+        if (isCompleted) beforeCompletedDays++;
+      }
+    }
+    checkDate.setDate(checkDate.getDate() - 1);
+    daysChecked++;
+  }
+
+  let duringScheduledDays = 0;
+  let duringCompletedDays = 0;
+  let currentStreak = 0;
+  let streakIntact = true;
+
+  checkDate = new Date(startDateStr + 'T00:00:00');
+  
+  while (true) {
+    const year = checkDate.getFullYear();
+    const month = String(checkDate.getMonth() + 1).padStart(2, '0');
+    const day = String(checkDate.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    if (dateStr >= todayLogical) break;
+
+    if (isHabitScheduledForDate(habit, dateStr)) {
+      duringScheduledDays++;
+      const log = logs.find(l => l.habit_id === habit.id && l.logical_date === dateStr);
+      const hasFreeze = freezes.some(f => f.habit_id === habit.id && f.logical_date === dateStr);
+      
+      let isCompleted = false;
+      if (log) {
+        isCompleted = log.count_completed >= habit.target_count;
+      }
+
+      if (isCompleted || hasFreeze) {
+        duringCompletedDays++;
+        if (streakIntact) currentStreak++;
+      } else {
+        streakIntact = false;
+        currentStreak = 0;
+      }
+    }
+    checkDate.setDate(checkDate.getDate() + 1);
+  }
+
+  const todayLog = logs.find(l => l.habit_id === habit.id && l.logical_date === todayLogical);
+  if (todayLog && todayLog.count_completed >= habit.target_count) {
+    if (streakIntact) currentStreak++;
+  }
+
+  const beforeRate = beforeScheduledDays > 0 ? Math.round((beforeCompletedDays / beforeScheduledDays) * 100) : 0;
+  const duringRate = duringScheduledDays > 0 ? Math.round((duringCompletedDays / duringScheduledDays) * 100) : 0;
+
+  return {
+    beforeRate,
+    duringRate,
+    currentStreak,
+    daysInRecovery: duringScheduledDays
+  };
+}

@@ -282,10 +282,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ activeTab = 'habits', show
   const togglePlannerPriority = useStore(state => state.togglePlannerPriority);
   const deletePlannerPriority = useStore(state => state.deletePlannerPriority);
   
-  const [internalShowHabitForm, setInternalShowHabitForm] = useState(false);
-  const showHabitForm = propsShowHabitForm !== undefined ? propsShowHabitForm : internalShowHabitForm;
-  const setShowHabitForm = propsSetShowHabitForm !== undefined ? propsSetShowHabitForm : setInternalShowHabitForm;
-  const [editHabitId, setEditHabitId] = useState<string | undefined>(undefined);
+  const storeEditHabitId = useStore(state => state.editHabitId);
+  const storeSetEditHabitId = useStore(state => state.setEditHabitId);
+  const storeShowHabitForm = useStore(state => state.showHabitForm);
+  const storeSetShowHabitForm = useStore(state => state.setShowHabitForm);
+
+  const showHabitForm = propsShowHabitForm !== undefined ? propsShowHabitForm : storeShowHabitForm;
+  const setShowHabitForm = propsSetShowHabitForm !== undefined ? propsSetShowHabitForm : storeSetShowHabitForm;
+  const editHabitId = storeEditHabitId || undefined;
+  const setEditHabitId = (id: string | undefined) => storeSetEditHabitId(id || null);
   const [sleepStart, setSleepStart] = useState('');
   const [sleepEnd, setSleepEnd] = useState('');
   const [selectedMood, setSelectedMood] = useState<'hyperactive' | 'happy' | 'okay' | 'sad' | 'depressed' | ''>('');

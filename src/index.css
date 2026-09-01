@@ -3,8 +3,8 @@
 @variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-poppins: 'Poppins', sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-poppins: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
 
   --color-accent-green: #10b981;
   --color-accent-green-neon: #00ff66;
@@ -86,9 +86,10 @@
   html, body {
     background-color: var(--bg-color);
     color: var(--text-color);
-    font-family: var(--font-sans);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro", "Helvetica Neue", Helvetica, Arial, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
     overflow-x: hidden;
     transition: background-color 0.2s ease, color 0.2s ease;
   }

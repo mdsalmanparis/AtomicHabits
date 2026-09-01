@@ -22,11 +22,12 @@ import {
 import { Trophy, CircleDot, Flame, RefreshCw, Sparkles, Activity, TrendingUp, Shield } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { getLevelTitle, getTotalXPForLevel } from '../utils/levelUtils';
+import { getRecoveryData, getRecoveryStats, isEligibleForRecovery } from '../utils/habitFilters';
 
 
 
 export interface AnalyticsProps {
-  onNavigate?: (tab: 'habits' | 'growth' | 'analytics' | 'achievements' | 'settings') => void;
+  onNavigate?: (tab: 'habits' | 'analytics' | 'achievements' | 'settings' | 'vita') => void;
 }
 
 export const Analytics: React.FC<AnalyticsProps> = ({ onNavigate }) => {
@@ -248,7 +249,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onNavigate }) => {
     );
   };
 
-  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<'habits' | 'wellbeing'>('habits');
+  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState<'habits' | 'wellbeing' | 'improvements'>('habits');
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isLoadingAi, setIsLoadingAi] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
@@ -751,6 +752,16 @@ CRITICAL INSTRUCTIONS:
           }`}
         >
           Wellbeing Insights
+        </button>
+        <button
+          onClick={() => setActiveAnalyticsTab('improvements')}
+          className={`pb-2 text-xs font-black uppercase tracking-wider transition-colors border-b-2 cursor-pointer ${
+            activeAnalyticsTab === 'improvements'
+              ? 'border-indigo-500 text-indigo-500'
+              : 'border-transparent text-neutral-500 hover:text-neutral-450'
+          }`}
+        >
+          Improvements & Recovery
         </button>
       </div>
 
@@ -1384,7 +1395,7 @@ CRITICAL INSTRUCTIONS:
 
       </div>
     </>
-  ) : (
+  ) : activeAnalyticsTab === 'wellbeing' ? (
       /* Wellbeing Insights View */
       <div className="space-y-6 animate-fadeIn">
         {!hasWellbeingData ? (
@@ -1572,6 +1583,182 @@ CRITICAL INSTRUCTIONS:
             </div>
           </>
         )}
+      </div>
+    ) : (
+      /* Improvements & Recovery View */
+      <div className="space-y-6 animate-fadeIn select-none">
+        {/* Intro Header */}
+        <div className="cred-card p-6 rounded-xl border border-border-primary bg-card-bg/40 backdrop-blur-sm shadow-sm space-y-2">
+          <h3 className="text-sm font-black font-poppins text-emerald-500 flex items-center gap-1.5">
+            <span>🍃</span>
+            <span>Eco Leaf Recovery Systems</span>
+          </h3>
+          <p className="text-xs text-neutral-400 leading-relaxed font-semibold uppercase tracking-wider">
+            Consistent failure happens. Recovery Mode helps you scale down your habits to micro-actions (sub-habits) to maintain the daily voting habit streak. When consistency is rebuilt (7+ days), you can safely upgrade.
+          </p>
+        </div>
+
+        {(() => {
+          const activeRecovery = habits.filter(h => !h.is_archived && getRecoveryData(h));
+          const eligibleRecovery = habits.filter(h => isEligibleForRecovery(h, logs, freezes, profile.day_offset_hours));
+
+          if (activeRecovery.length === 0 && eligibleRecovery.length === 0) {
+            return (
+              <div className="text-center py-12 border border-dashed border-border-primary rounded-xl bg-card-bg/10">
+                <Icons.Leaf className="h-10 w-10 text-neutral-600 mx-auto mb-3" />
+                <h4 className="text-xs font-black uppercase tracking-wider text-neutral-450">All Routines Stable</h4>
+                <p className="text-[10px] text-neutral-505 mt-1 max-w-xs mx-auto font-bold uppercase tracking-wider">
+                  No habits are currently failing or in Recovery Mode. Keep up the consistency!
+                </p>
+              </div>
+            );
+          }
+
+          return (
+            <div className="space-y-6">
+              {/* Active Recovery Section */}
+              {activeRecovery.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-emerald-500">Active Recoveries ({activeRecovery.length})</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {activeRecovery.map(h => {
+                      const rec = getRecoveryData(h)!;
+                      const rStats = getRecoveryStats(h, logs, freezes, profile.day_offset_hours)!;
+                      const improvement = rStats.duringRate - rStats.beforeRate;
+
+                      return (
+                        <div key={h.id} className="cred-card p-5 rounded-xl border border-emerald-500/25 bg-card-bg space-y-4">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h5 className="text-sm font-extrabold text-text-primary font-poppins">{h.name}</h5>
+                              <p className="text-[9px] text-neutral-500 uppercase tracking-wider font-bold mt-0.5">
+                                Started recovery on {rec.recovery_start_date}
+                              </p>
+                            </div>
+                            <span className="text-[9px] font-black uppercase bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 px-2 py-0.5 rounded-full">
+                              Streak: {rStats.currentStreak}d
+                            </span>
+                          </div>
+
+                          {/* Before vs During Metric comparison */}
+                          <div className="grid grid-cols-2 gap-3 bg-neutral-950/30 p-3 rounded-lg border border-border-primary/50">
+                            <div>
+                              <span className="block text-[8px] font-black uppercase text-neutral-500 tracking-wider">Before Rate</span>
+                              <span className="text-base font-extrabold text-neutral-400">{rStats.beforeRate}%</span>
+                            </div>
+                            <div>
+                              <span className="block text-[8px] font-black uppercase text-emerald-500 tracking-wider">During Rate</span>
+                              <span className="text-base font-extrabold text-emerald-500 flex items-center gap-1.5">
+                                <span>{rStats.duringRate}%</span>
+                                {improvement > 0 && (
+                                  <span className="text-[9px] font-black bg-emerald-500/20 px-1 py-0.5 rounded text-emerald-400">
+                                    +{improvement}%
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Sub-habits checklist read-only view */}
+                          <div className="space-y-1.5 pt-1">
+                            <span className="block text-[8px] font-black uppercase text-neutral-500 tracking-wider">Simplified Sub-Actions</span>
+                            <div className="space-y-1">
+                              {rec.sub_habits.map((sub) => (
+                                <div key={sub.id} className="text-xs font-semibold text-text-primary flex items-center gap-2">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                                  <span>{sub.name}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Upgrade or Archive CTA */}
+                          <div className="pt-2 border-t border-border-primary flex justify-between gap-3">
+                            {rStats.currentStreak >= 7 ? (
+                              <button
+                                onClick={() => {
+                                  useStore.getState().setEditHabitId(h.id);
+                                  useStore.getState().setShowHabitForm(true);
+                                  if (onNavigate) onNavigate('habits');
+                                }}
+                                className="flex-1 bg-emerald-500 hover:bg-emerald-450 text-black text-[10px] font-black uppercase tracking-wider py-2 rounded-lg cursor-pointer text-center"
+                              >
+                                🚀 Ready to Upgrade!
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  useStore.getState().setEditHabitId(h.id);
+                                  useStore.getState().setShowHabitForm(true);
+                                  if (onNavigate) onNavigate('habits');
+                                }}
+                                className="flex-1 bg-neutral-900 border border-border-primary hover:border-border-hover text-text-primary text-[10px] font-black uppercase tracking-wider py-2 rounded-lg cursor-pointer text-center"
+                              >
+                                Modify (Edit)
+                              </button>
+                            )}
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Are you sure you want to archive "${h.name}"?`)) {
+                                  await useStore.getState().archiveHabit(h.id);
+                                }
+                              }}
+                              className="bg-rose-500/10 hover:bg-rose-500/25 border border-rose-500/20 text-rose-500 text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-lg cursor-pointer transition-colors"
+                            >
+                              Archive
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Eligible for Recovery Section */}
+              {eligibleRecovery.length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase tracking-wider text-amber-500">Suggested Recoveries ({eligibleRecovery.length})</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {eligibleRecovery.map(h => (
+                      <div key={h.id} className="cred-card p-5 rounded-xl border border-amber-500/25 bg-card-bg space-y-3">
+                        <div>
+                          <h5 className="text-sm font-extrabold text-text-primary font-poppins">{h.name}</h5>
+                          <p className="text-[9px] text-neutral-500 uppercase tracking-wider font-bold mt-0.5">
+                            Consistent failures detected (missed/skipped for 3+ consecutive days)
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              useStore.getState().setEditHabitId(h.id);
+                              useStore.getState().setShowHabitForm(true);
+                              if (onNavigate) onNavigate('habits');
+                            }}
+                            className="flex-1 bg-amber-500 hover:bg-amber-450 text-black text-[10px] font-black uppercase tracking-wider py-2 rounded-lg cursor-pointer text-center flex items-center justify-center gap-1.5"
+                          >
+                            <Icons.Leaf className="h-3 w-3 fill-current text-black" />
+                            <span>Enter Recovery Mode</span>
+                          </button>
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Are you sure you want to archive "${h.name}"?`)) {
+                                await useStore.getState().archiveHabit(h.id);
+                              }
+                            }}
+                            className="bg-neutral-900 border border-border-primary hover:border-border-hover text-rose-500 text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-lg cursor-pointer"
+                          >
+                            Archive
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </div>
     )}
 
